@@ -26,6 +26,32 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
+      - name: Resolve the API host
+        shell: bash
+        run: |
+          set -euo pipefail
+          ip=""
+          for _ in $(seq 1 20); do
+            ip=$(tailscale status --json | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for peer in d.get("Peer", {}).values():
+    name=(peer.get("DNSName") or "") + " " + (peer.get("HostName") or "")
+    if "ailab" in name.lower() and peer.get("TailscaleIPs"):
+        print(peer["TailscaleIPs"][0])
+        break')
+            if [ -n "$ip" ]; then
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$ip" ]; then
+            echo "ailab is not visible on the tailnet" >&2
+            tailscale status >&2 || true
+            exit 1
+          fi
+          grep -q 'ailab.tail0b303.ts.net' /etc/hosts || echo "$ip ailab.tail0b303.ts.net" | sudo tee -a /etc/hosts >/dev/null
+          getent hosts ailab.tail0b303.ts.net
+
       - name: Install kubectl
         shell: bash
         run: |
