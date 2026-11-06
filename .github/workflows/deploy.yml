@@ -1,7 +1,7 @@
-# Load the already published ghcr.io images onto the k3s node and roll the realm.
-# The packages are private, and the node has no registry login, so this job pulls
-# them with the workflow token and imports them into containerd before the rollout.
-# A busy auth, gateway, or world process is left running until its sockets close.
+# Roll the skyfire namespace onto the images already published at ghcr.io.
+# The packages are private. The node pulls them with this job's token, which is
+# removed after the new pods are up. A busy auth, gateway, or world process stays
+# up until its sockets close.
 
 name: deploy
 
@@ -21,24 +21,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull published images
-        shell: bash
-        run: |
-          set -euo pipefail
-          for target in authserver worldserver clustergateway; do
-            docker pull "ghcr.io/${OWNER}/skyfire-${target}:${IMAGE_TAG}"
-          done
-
       - name: Join the tailnet
         uses: tailscale/github-action@v3
         with:
@@ -65,22 +47,19 @@ jobs:
           printf '%s\n' "$KUBECONFIG_CONTENT" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
-      - name: Import images into the node
+      - name: Give the node a pull secret
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
-          ns=skyfire
-          kubectl -n "$ns" delete pod image-loader --ignore-not-found --wait=true
-          kubectl -n "$ns" apply -f deploy/k8s/image-loader.yaml
-          kubectl -n "$ns" wait --for=condition=Ready pod/image-loader --timeout=180s
-          k3s_bin=$(kubectl -n "$ns" exec image-loader -- chroot /host sh -c 'for p in /usr/local/bin/k3s /usr/bin/k3s /bin/k3s; do [ -x "$p" ] && echo "$p" && exit 0; done; exit 1')
-          echo "importing with ${k3s_bin}"
-          docker save \
-            "ghcr.io/${OWNER}/skyfire-authserver:${IMAGE_TAG}" \
-            "ghcr.io/${OWNER}/skyfire-worldserver:${IMAGE_TAG}" \
-            "ghcr.io/${OWNER}/skyfire-clustergateway:${IMAGE_TAG}" \
-            | kubectl -n "$ns" exec -i image-loader -- chroot /host "$k3s_bin" ctr -n k8s.io images import -
-          kubectl -n "$ns" delete pod image-loader --wait=false
+          kubectl -n skyfire delete pod image-loader --ignore-not-found --wait=false
+          kubectl -n skyfire create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="$GH_ACTOR" \
+            --docker-password="$GH_TOKEN" \
+            --dry-run=client -o yaml | kubectl -n skyfire apply -f -
 
       - name: Roll the realm
         shell: bash
@@ -128,7 +107,7 @@ jobs:
             done
 
             drain=$(printf '%s' "hex=\$(printf %04X ${port}); while awk -v p=\"\$hex\" 'NR>1 { split(\$2,a,\":\"); if (toupper(a[2])==toupper(p) && \$4==\"01\") e=1 } END { exit !e }' /proc/net/tcp /proc/net/tcp6; do sleep 5; done")
-            NAME="$name" IMAGE="$image" DRAIN="$drain" python3 -c 'import json,os; print(json.dumps({"spec":{"minReadySeconds":600,"progressDeadlineSeconds":86400,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":1,"maxUnavailable":0}},"template":{"spec":{"terminationGracePeriodSeconds":86400,"containers":[{"name":os.environ["NAME"],"image":os.environ["IMAGE"],"imagePullPolicy":"IfNotPresent","lifecycle":{"preStop":{"exec":{"command":["bash","-c",os.environ["DRAIN"]]}}}}]}}}}))' > /tmp/front-patch.json
+            NAME="$name" IMAGE="$image" DRAIN="$drain" python3 -c 'import json,os; print(json.dumps({"spec":{"minReadySeconds":600,"progressDeadlineSeconds":86400,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":1,"maxUnavailable":0}},"template":{"spec":{"terminationGracePeriodSeconds":86400,"imagePullSecrets":[{"name":"ghcr-pull"}],"containers":[{"name":os.environ["NAME"],"image":os.environ["IMAGE"],"imagePullPolicy":"IfNotPresent","lifecycle":{"preStop":{"exec":{"command":["bash","-c",os.environ["DRAIN"]]}}}}]}}}}))' > /tmp/front-patch.json
             kubectl -n "$ns" patch "deploy/${name}" --type=strategic --patch-file /tmp/front-patch.json
 
             local deadline=$((SECONDS + 900))
@@ -167,7 +146,7 @@ jobs:
             fi
             kubectl -n "$ns" set image "statefulset/world-${role}" "worldserver=${image}"
             kubectl -n "$ns" patch "statefulset/world-${role}" --type=strategic \
-              -p '{"spec":{"template":{"spec":{"terminationGracePeriodSeconds":86400,"containers":[{"name":"worldserver","imagePullPolicy":"IfNotPresent"}]}}}}'
+              -p '{"spec":{"template":{"spec":{"terminationGracePeriodSeconds":86400,"imagePullSecrets":[{"name":"ghcr-pull"}],"containers":[{"name":"worldserver","imagePullPolicy":"IfNotPresent"}]}}}}'
             kubectl -n "$ns" rollout status "statefulset/world-${role}" --timeout=300s
           }
 
@@ -176,4 +155,5 @@ jobs:
           for role in oldworld outland northrend pandaria bg; do
             roll_world "$role"
           done
+          kubectl -n "$ns" delete secret ghcr-pull --ignore-not-found
           kubectl -n "$ns" get pods -o wide
