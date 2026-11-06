@@ -647,6 +647,8 @@ public:                                                 // opcodes handlers
     // Boost
     void SendBattlePayDistributionUpdate(uint64 playerGuid, int8 bonusId, int32 bonusFlag, int32 textId, std::string const& bonusText, std::string const& bonusText2);
     void HandleBattlePayCharBoost(WorldPacket& recvPacket);
+    void HandleBattlePayGetProductList(WorldPacket& recvPacket);
+    void HandleBattlePayGetPurchaseList(WorldPacket& recvPacket);
 
     // new
     void HandleMoveUnRootAck(WorldPacket& recvPacket);

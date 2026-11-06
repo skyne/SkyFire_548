@@ -88,8 +88,8 @@ void OpcodeTable::InitializeClientTable()
     DEFINE_OPCODE_HANDLER(CMSG_BATTLEMASTER_JOIN_ARENA,                 0x02D2, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleBattlemasterJoinArena           ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_CHAR_BOOST,                   0x08E3, STATUS_AUTHED,                       PROCESS_THREADUNSAFE, &WorldSession::HandleBattlePayCharBoost              ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_CONFIRM_PURCHASE_RESPONSE,    0x0812, STATUS_UNHANDLED,                    PROCESS_THREADUNSAFE, &WorldSession::Handle_NULL                           ); // 5.4.8 18414
-    DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_GET_PRODUCT_LIST,             0x0DE0, STATUS_UNHANDLED,                    PROCESS_THREADUNSAFE, &WorldSession::Handle_NULL                           ); // 5.4.8 18414
-    DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_GET_PURCHASE_LIST,            0x18B2, STATUS_UNHANDLED,                    PROCESS_THREADUNSAFE, &WorldSession::Handle_NULL                           ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_GET_PRODUCT_LIST,             0x0DE0, STATUS_AUTHED,                       PROCESS_THREADUNSAFE, &WorldSession::HandleBattlePayGetProductList           ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_GET_PURCHASE_LIST,            0x18B2, STATUS_AUTHED,                       PROCESS_THREADUNSAFE, &WorldSession::HandleBattlePayGetPurchaseList          ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PAY_START_PURCHASE,               0x1886, STATUS_UNHANDLED,                    PROCESS_THREADUNSAFE, &WorldSession::Handle_NULL                           ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PET_CAGE,                         0x1561, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleBattlePetCage                   ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BATTLE_PET_DELETE_PET,                   0x18B6, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleBattlePetDelete                 ); // 5.4.8 18414
@@ -591,6 +591,8 @@ void OpcodeTable::InitializeServerTable()
     DEFINE_OPCODE_HANDLER(SMSG_BATTLEGROUND_PLAYER_LEFT,                       0x0206, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PAY_BOOST_ITEMS,                         0x083B, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PAY_DISTRIBUTION_UPDATE,                 0x1E1B, STATUS_NEVER    ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PAY_GET_PRODUCT_LIST_RESPONSE,           0x1ABF, STATUS_NEVER    ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE,          0x023A, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PET_CAGE_DATE_ERROR,                     0x068B, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PET_DELETED,                             0x18AB, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_BATTLE_PET_HEALED,                              0x0E9E, STATUS_NEVER    ); // 5.4.8 18414

@@ -1,5 +1,6 @@
 # One run per push: build once with PCH, publish images from that build, then
-# roll the skyfire namespace.
+# roll the skyfire namespace. Each image is tagged with the first 12 characters
+# of the commit sha, so a new build never reuses the previous tag.
 #
 # Deploy reaches the cluster over Tailscale. Add these before turning it on:
 #   secret  TAILSCALE_AUTHKEY   reusable, ephemeral auth key for the tailnet
@@ -46,7 +47,6 @@ env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CC: gcc-14
   CXX: g++-14
-  IMAGE_TAG: "548"
 
 jobs:
   build:
@@ -55,6 +55,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set image tag
+      shell: bash
+      run: |
+        set -euo pipefail
+        tag="${GITHUB_SHA:0:12}"
+        echo "IMAGE_TAG=${tag}" >> "$GITHUB_ENV"
+        echo "Images will be tagged ${tag}"
 
     - name: Check game source tabs
       shell: pwsh

@@ -80,7 +80,7 @@ gh run watch <databaseId> --exit-status
 gh run view <databaseId> --json conclusion,url,status,jobs
 ```
 
-The job builds with PCH, pushes `ghcr.io/<owner>/skyfire-{authserver,worldserver,clustergateway}:548` from that build, then the `Roll the realm` step rolls namespace `skyfire`: `authserver`, `clustergateway`, and world roles `oldworld`, `outland`, `northrend`, `pandaria`, `bg`. A world pod that still has players is left on the old process; the workflow can still succeed.
+The job builds with PCH, pushes `ghcr.io/<owner>/skyfire-{authserver,worldserver,clustergateway}:<12-char sha>` from that build, then the `Roll the realm` step rolls namespace `skyfire`: `authserver`, `clustergateway`, and world roles `oldworld`, `outland`, `northrend`, `pandaria`, `bg`. A world pod that still has players is left on the old process; the workflow can still succeed.
 
 If `gh run watch` returns while the run is still `in_progress` or `queued`, poll `gh run view` again until `conclusion` is set. Do not start a second deploy.
 

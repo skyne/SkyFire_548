@@ -7,13 +7,18 @@ name: deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to roll (12-character commit sha). Empty uses the selected ref.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
   packages: read
 
 env:
-  IMAGE_TAG: "548"
   OWNER: skyne
 
 jobs:
@@ -21,6 +26,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
+      - name: Set image tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then
+            tag="${GITHUB_SHA:0:12}"
+          fi
+          if ! [[ "$tag" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "Image tag must be a commit sha, got: ${tag}" >&2
+            exit 1
+          fi
+          echo "IMAGE_TAG=${tag}" >> "$GITHUB_ENV"
+          echo "Rolling images tagged ${tag}"
+
       - name: Join the tailnet
         uses: tailscale/github-action@v3
         with:
@@ -80,8 +100,7 @@ jobs:
             --docker-username="$GH_ACTOR" \
             --docker-password="$GH_TOKEN" \
             --dry-run=client -o yaml | kubectl -n skyfire apply -f -
-          # The same :548 tag is already cached, and it is the build that exits
-          # while loading the legacy provider. Drop it so the pull is not skipped.
+          # A rerun of this commit must not keep a cached copy of the same tag.
           kubectl -n skyfire delete pod image-loader --ignore-not-found --wait=true
           python3 -c 'open("/tmp/loader.yaml","w").write("apiVersion: v1\nkind: Pod\nmetadata:\n  name: image-loader\n  namespace: skyfire\nspec:\n  restartPolicy: Never\n  hostPID: true\n  containers:\n    - name: loader\n      image: busybox:1.36.1\n      command: [\"sleep\", \"180\"]\n      securityContext:\n        privileged: true\n      volumeMounts:\n        - name: host\n          mountPath: /host\n  volumes:\n    - name: host\n      hostPath:\n        path: /\n")'
           kubectl -n skyfire apply -f /tmp/loader.yaml
