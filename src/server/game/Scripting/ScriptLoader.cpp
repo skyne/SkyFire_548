@@ -187,6 +187,25 @@ void AddSC_the_scarlet_enclave_c5();
 //void AddSC_boss_scorn();
 //void AddSC_instance_scarlet_monastery();
 //void AddSC_boss_mograine_and_whitemane();
+// MoP Scarlet Halls, Scarlet Monastery revamp (classic sources stay unlinked), Scholomance
+void AddSC_boss_armsmaster_harlan();
+void AddSC_boss_flameweaver_koegler();
+void AddSC_boss_houndmaster_braun();
+void AddSC_instance_scarlet_halls();
+void AddSC_scarlet_halls();
+void AddSC_boss_brother_korloff();
+void AddSC_boss_headless_horseman();
+void AddSC_boss_whitemane_and_durand();
+void AddSC_boss_thalnos_the_soulrender();
+void AddSC_instance_scarlet_monastery();
+void AddSC_scarlet_monastery();
+void AddSC_boss_grandmaster_gandling();
+void AddSC_boss_instructor_chillheart();
+void AddSC_boss_jandice_barov();
+void AddSC_boss_lilian_voss();
+void AddSC_boss_rattlegore();
+void AddSC_instance_scholomance();
+void AddSC_scholomance();
 
 //void AddSC_shadowfang_keep();                //Shadowfang keep
 //void AddSC_instance_shadowfang_keep();
@@ -641,6 +660,32 @@ void AddSC_boss_hoptallus();
 void AddSC_boss_ook_ook();
 void AddSC_instance_stormstout_brewery();
 void AddSC_stormstout_brewery();
+// Mogu'shan Palace
+void AddSC_boss_gekkan();
+void AddSC_boss_trial_of_the_king();
+void AddSC_boss_xin_the_weaponmaster();
+void AddSC_instance_mogu_shan_palace();
+// Shado-pan Monastery
+void AddSC_boss_gu_cloudstrike();
+void AddSC_boss_master_snowdrift();
+void AddSC_boss_sha_of_violence();
+void AddSC_boss_taran_zhu();
+void AddSC_instance_shadopan_monastery();
+void AddSC_shadopan_monastery();
+// Gate of the Setting Sun
+void AddSC_boss_commander_rimok();
+void AddSC_boss_raigonn();
+void AddSC_boss_saboteur_kiptilak();
+void AddSC_boss_striker_gadok();
+void AddSC_gate_of_the_setting_sun();
+void AddSC_instance_gate_of_the_setting_sun();
+// Siege of Niuzao Temple
+void AddSC_commander_vojak();
+void AddSC_general_pavalak();
+void AddSC_vizier_jinbak();
+void AddSC_wing_leader_neronok();
+void AddSC_instance_siege_of_niuzao_temple();
+void AddSC_siege_of_niuzao_temple();
 // Valley of the four Winds
 void AddSC_valley_of_the_four_winds();
 
@@ -888,6 +933,25 @@ void AddEasternKingdomsScripts()
     //AddSC_boss_scorn();
     //AddSC_instance_scarlet_monastery();
     //AddSC_boss_mograine_and_whitemane();
+    // MoP Scarlet Halls, Scarlet Monastery revamp, Scholomance
+    AddSC_boss_armsmaster_harlan();
+    AddSC_boss_flameweaver_koegler();
+    AddSC_boss_houndmaster_braun();
+    AddSC_instance_scarlet_halls();
+    AddSC_scarlet_halls();
+    AddSC_boss_brother_korloff();
+    AddSC_boss_headless_horseman();
+    AddSC_boss_whitemane_and_durand();
+    AddSC_boss_thalnos_the_soulrender();
+    AddSC_instance_scarlet_monastery();
+    AddSC_scarlet_monastery();
+    AddSC_boss_grandmaster_gandling();
+    AddSC_boss_instructor_chillheart();
+    AddSC_boss_jandice_barov();
+    AddSC_boss_lilian_voss();
+    AddSC_boss_rattlegore();
+    AddSC_instance_scholomance();
+    AddSC_scholomance();
 
     //AddSC_shadowfang_keep();                //Shadowfang keep
     //AddSC_instance_shadowfang_keep();
@@ -1368,6 +1432,32 @@ void AddPandariaScripts()
     AddSC_boss_ook_ook();
     AddSC_instance_stormstout_brewery();
     AddSC_stormstout_brewery();
+    // Mogu'shan Palace
+    AddSC_boss_gekkan();
+    AddSC_boss_trial_of_the_king();
+    AddSC_boss_xin_the_weaponmaster();
+    AddSC_instance_mogu_shan_palace();
+    // Shado-pan Monastery
+    AddSC_boss_gu_cloudstrike();
+    AddSC_boss_master_snowdrift();
+    AddSC_boss_sha_of_violence();
+    AddSC_boss_taran_zhu();
+    AddSC_instance_shadopan_monastery();
+    AddSC_shadopan_monastery();
+    // Gate of the Setting Sun
+    AddSC_boss_commander_rimok();
+    AddSC_boss_raigonn();
+    AddSC_boss_saboteur_kiptilak();
+    AddSC_boss_striker_gadok();
+    AddSC_gate_of_the_setting_sun();
+    AddSC_instance_gate_of_the_setting_sun();
+    // Siege of Niuzao Temple
+    AddSC_commander_vojak();
+    AddSC_general_pavalak();
+    AddSC_vizier_jinbak();
+    AddSC_wing_leader_neronok();
+    AddSC_instance_siege_of_niuzao_temple();
+    AddSC_siege_of_niuzao_temple();
     // Valley of the four Winds
     AddSC_valley_of_the_four_winds();
 #endif
