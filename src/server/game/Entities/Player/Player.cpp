@@ -518,7 +518,7 @@ void KillRewarder::Reward()
 #ifdef _MSC_VER
 #pragma warning(disable:4355)
 #endif
-Player::Player(WorldSession* session) : Unit(true)
+Player::Player(WorldSession* session) : Unit(true), m_VignetteMgr(this)
 {
 #ifdef _MSC_VER
 #pragma warning(default:4355)
@@ -1780,6 +1780,9 @@ void Player::Update(uint32 p_time)
     //because we don't want player's ghost teleported from graveyard
     if (IsHasDelayedTeleport() && IsAlive())
         TeleportTo(m_teleport_dest, m_teleport_options);
+
+    // Map::Update calls Player::Update for every in-world player. That is the vignette tick.
+    m_VignetteMgr.Update();
 
     // Per-tick script hook so modules can drive extra per-player work.
     sScriptMgr->OnPlayerUpdate(this, p_time);
@@ -19042,6 +19045,7 @@ void Player::UpdateVisibilityOf(WorldObject* target)
         {
             target->DestroyForPlayer(this);
             m_clientGUIDs.erase(target->GetGUID());
+            GetVignetteMgr().OnWorldObjectDisappear(target);
         }
 
         return;
@@ -19056,6 +19060,7 @@ void Player::UpdateVisibilityOf(WorldObject* target)
 
             target->DestroyForPlayer(this);
             m_clientGUIDs.erase(target->GetGUID());
+            GetVignetteMgr().OnWorldObjectDisappear(target);
 
 #ifdef SKYFIRE_DEBUG
             SF_LOG_DEBUG("maps", "Object %u (Type: %u) out of range for player %u. Distance = %f", target->GetGUIDLow(), target->GetTypeId(), GetGUIDLow(), GetDistance(target));
@@ -19068,6 +19073,7 @@ void Player::UpdateVisibilityOf(WorldObject* target)
         {
             target->SendUpdateToPlayer(this);
             m_clientGUIDs.insert(target->GetGUID());
+            GetVignetteMgr().OnWorldObjectAppear(target);
 
 #ifdef SKYFIRE_DEBUG
             SF_LOG_DEBUG("maps", "Object %u (Type: %u) is visible now for player %u. Distance = %f", target->GetGUIDLow(), target->GetTypeId(), GetGUIDLow(), GetDistance(target));
@@ -19142,6 +19148,7 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
         {
             target->BuildOutOfRangeUpdateBlock(&data);
             m_clientGUIDs.erase(target->GetGUID());
+            GetVignetteMgr().OnWorldObjectDisappear(target);
         }
 
         return;
@@ -19155,6 +19162,7 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
 
             target->BuildOutOfRangeUpdateBlock(&data);
             m_clientGUIDs.erase(target->GetGUID());
+            GetVignetteMgr().OnWorldObjectDisappear(target);
 
 #ifdef SKYFIRE_DEBUG
             SF_LOG_DEBUG("maps", "Object %u (Type: %u, Entry: %u) is out of range for player %u. Distance = %f", target->GetGUIDLow(), target->GetTypeId(), target->GetEntry(), GetGUIDLow(), GetDistance(target));
@@ -19167,6 +19175,7 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
         {
             target->BuildCreateUpdateBlockForPlayer(&data, this);
             UpdateVisibilityOf_helper(m_clientGUIDs, target, visibleNow);
+            GetVignetteMgr().OnWorldObjectAppear(target);
 
 #ifdef SKYFIRE_DEBUG
             SF_LOG_DEBUG("maps", "Object %u (Type: %u, Entry: %u) is visible now for player %u. Distance = %f", target->GetGUIDLow(), target->GetTypeId(), target->GetEntry(), GetGUIDLow(), GetDistance(target));

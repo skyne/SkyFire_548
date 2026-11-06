@@ -32,6 +32,7 @@
 #include "Totem.h"
 #include "Transport.h"
 #include "Unit.h"
+#include "Vignette.h"
 #include "UpdateData.h"
 #include "UpdateFieldFlags.h"
 #include "UpdateMask.h"
@@ -1561,7 +1562,8 @@ void MovementInfo::OutDebug()
 WorldObject::WorldObject(bool isWorldObject) : WorldLocation(),
 m_name(""), m_isActive(false), m_isWorldObject(isWorldObject), m_zoneScript(NULL),
 m_transport(NULL), m_currMap(NULL), m_InstanceId(0),
-m_phaseMask(PHASEMASK_NORMAL), m_notifyflags(0), m_executed_notifies(0)
+m_phaseMask(PHASEMASK_NORMAL), m_notifyflags(0), m_executed_notifies(0),
+m_vignetteId(0), m_vignetteTrackingQuest(0)
 {
     m_serverSideVisibility.SetValue(SERVERSIDE_VISIBILITY_GHOST, GHOST_VISIBILITY_ALIVE | GHOST_VISIBILITY_GHOST);
     m_serverSideVisibilityDetect.SetValue(SERVERSIDE_VISIBILITY_GHOST, GHOST_VISIBILITY_ALIVE);
@@ -3671,6 +3673,15 @@ void WorldObject::PlayDirectSound(uint32 sound_id, Player* target /*= NULL*/)
         SendMessageToSet(&data, true);
 }
 
+void WorldObject::SetVignette(uint32 vignetteId, uint32 trackingQuestId)
+{
+    if (!Vignette::HasVignetteEntry(vignetteId))
+        vignetteId = 0;
+
+    m_vignetteId = vignetteId;
+    m_vignetteTrackingQuest = vignetteId ? trackingQuestId : 0;
+}
+
 void WorldObject::DestroyForNearbyPlayers()
 {
     if (!IsInWorld())
@@ -3695,6 +3706,7 @@ void WorldObject::DestroyForNearbyPlayers()
 
         DestroyForPlayer(player);
         player->m_clientGUIDs.erase(GetGUID());
+        player->GetVignetteMgr().OnWorldObjectDisappear(this);
     }
 }
 

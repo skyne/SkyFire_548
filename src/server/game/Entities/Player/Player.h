@@ -19,6 +19,7 @@
 #include "QuestDef.h"
 #include "SpellMgr.h"
 #include "Unit.h"
+#include "VignetteMgr.h"
 #include "WorldSession.h"
 
 #include <string>
@@ -2631,6 +2632,10 @@ public:
         return m_battlePetMgr;
     }
 
+    // Minimap rares and treasures. Map::Update reaches this through Player::Update.
+    Vignette::Manager& GetVignetteMgr() { return m_VignetteMgr; }
+    Vignette::Manager const& GetVignetteMgr() const { return m_VignetteMgr; }
+
     /*********************************************************/
     /***                  PVP SYSTEM                       ***/
     /*********************************************************/
@@ -3689,6 +3694,8 @@ private:
     bool                m_FlyingBeforeCinematic;
 
     BattlePetMgr* m_battlePetMgr;
+
+    Vignette::Manager m_VignetteMgr;
 };
 
 void AddItemsSetItem(Player* player, Item* item);
