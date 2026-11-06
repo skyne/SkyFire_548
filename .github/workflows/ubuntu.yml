@@ -227,22 +227,6 @@ jobs:
           docker push "$image"
         done
 
-    - name: Make packages public
-      if: github.event_name != 'pull_request'
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        owner="${{ steps.names.outputs.owner }}"
-        for target in authserver worldserver clustergateway; do
-          pkg="skyfire-${target}"
-          if gh api --method PUT "/user/packages/container/${pkg}/visibility" -f visibility=public; then
-            continue
-          fi
-          gh api --method PUT "/orgs/${owner}/packages/container/${pkg}/visibility" -f visibility=public
-        done
-
     - name: Join the tailnet
       if: >-
         (github.event_name == 'workflow_dispatch' && inputs.deploy) ||
