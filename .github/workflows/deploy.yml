@@ -32,13 +32,7 @@ jobs:
           set -euo pipefail
           ip=""
           for _ in $(seq 1 20); do
-            ip=$(tailscale status --json | python3 -c 'import json,sys
-d=json.load(sys.stdin)
-for peer in d.get("Peer", {}).values():
-    name=(peer.get("DNSName") or "") + " " + (peer.get("HostName") or "")
-    if "ailab" in name.lower() and peer.get("TailscaleIPs"):
-        print(peer["TailscaleIPs"][0])
-        break')
+            ip=$(tailscale status --json | python3 -c 'import json,sys; d=json.load(sys.stdin); peers=d.get("Peer",{}).values(); print(next((p["TailscaleIPs"][0] for p in peers if "ailab" in (((p.get("DNSName") or "")+" "+(p.get("HostName") or "")).lower()) and p.get("TailscaleIPs")), ""))')
             if [ -n "$ip" ]; then
               break
             fi
