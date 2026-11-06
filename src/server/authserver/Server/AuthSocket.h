@@ -55,6 +55,7 @@ private:
     std::string _login;
     std::string _accountName;
     std::string _tokenKey;
+    uint64 _tokenLastUsedStep = 0;
     uint32 _accountId = 0;
 
     // Since GetLocaleByName() is _NOT_ bijective, we have to store the locale as a string. Otherwise we can't differ

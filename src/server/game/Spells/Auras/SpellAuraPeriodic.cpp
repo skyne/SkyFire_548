@@ -18,6 +18,7 @@
 #include "OutdoorPvPMgr.h"
 #include "Pet.h"
 #include "Player.h"
+#include "RaidScale.h"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "Spell.h"
@@ -581,6 +582,10 @@ void AuraEffect::HandlePeriodicDamageAurasTick(Unit* target, Unit* caster) const
     caster->ApplyResilience(target, &dmg, crit);
     damage = dmg;
 
+    // Percent-of-health ticks already follow the target's health. Flat ticks use the raid fraction.
+    if (GetAuraType() == SPELL_AURA_PERIODIC_DAMAGE)
+        RaidScale::ScaleDamage(caster, damage);
+
     caster->CalcAbsorbResist(target, GetSpellInfo()->GetSchoolMask(), DOT, damage, &absorb, &resist, GetSpellInfo());
 
     SF_LOG_INFO("spells", "PeriodicTick: %u (TypeId: %u) attacked %u (TypeId: %u) for %u dmg inflicted by %u abs is %u",
@@ -647,6 +652,8 @@ void AuraEffect::HandlePeriodicHealthLeechAuraTick(Unit* target, Unit* caster) c
     int32 dmg = damage;
     caster->ApplyResilience(target, &dmg, crit);
     damage = dmg;
+
+    RaidScale::ScaleDamage(caster, damage);
 
     caster->CalcAbsorbResist(target, GetSpellInfo()->GetSchoolMask(), DOT, damage, &absorb, &resist, m_spellInfo);
 

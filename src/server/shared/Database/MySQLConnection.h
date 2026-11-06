@@ -75,6 +75,8 @@ public:
 
 public:
     bool Execute(const char* sql);
+    // Rows changed by a successful INSERT/UPDATE/DELETE. 0 on failure or a no-op WHERE.
+    uint64 ExecuteAffected(const char* sql);
     bool Execute(PreparedStatement* stmt);
     ResultSet* Query(const char* sql);
     PreparedResultSet* Query(PreparedStatement* stmt);

@@ -22,8 +22,8 @@ void WorldSession::HandleTaxiNodeStatusQueryOpcode(WorldPacket& recvData)
 
     ObjectGuid guid;
 
-    recvData.ReadGuidMask(guid, 0, 1, 6, 4, 5, 2, 3, 7);
-    recvData.ReadGuidBytes(guid, 4, 1, 5, 0, 2, 7, 6, 3);
+    recvData.ReadGuidMask(guid, 7, 4, 1, 3, 0, 5, 2, 6);
+    recvData.ReadGuidBytes(guid, 7, 1, 5, 2, 4, 0, 6, 3);
 
     SendTaxiStatus(guid);
 }
@@ -164,14 +164,7 @@ bool WorldSession::SendLearnNewTaxiNode(Creature* unit)
         WorldPacket msg(SMSG_NEW_TAXI_PATH, 0);
         SendPacket(&msg);
 
-        WorldPacket update(SMSG_TAXI_NODE_STATUS, 9);
-        update.WriteBit(1);
-        ObjectGuid guid = unit->GetGUID();
-
-        update.WriteGuidMask(guid, 1, 7, 6, 5, 4, 0, 2, 3);
-        update.WriteGuidBytes(guid, 4, 2, 3, 6, 7, 0, 1, 5);
-
-        SendPacket(&update);
+        SendTaxiStatus(unit->GetGUID());
 
         return true;
     }

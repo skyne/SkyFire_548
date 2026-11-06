@@ -4,6 +4,7 @@
 */
 
 #include <algorithm>
+#include <cctype>
 
 #include "Auth/AccountIdentity.h"
 #include "AuthCodes.h"
@@ -560,7 +561,10 @@ bool AuthSocket::_HandleLogonChallenge()
                         {
                             Field* twoFactorFields = twoFactorResult->Fetch();
                             if (twoFactorFields[1].GetBool())
+                            {
                                 _tokenKey = twoFactorFields[0].GetString();
+                                _tokenLastUsedStep = twoFactorFields[2].GetUInt64();
+                            }
                         }
 
                         if (_tokenKey.empty() && sConfigMgr->GetBoolDefault("Auth2FA.AllowLegacyTokenKey", true))
@@ -676,9 +680,18 @@ bool AuthSocket::_HandleLogonProof()
 
             if (serverNeedsToken)
             {
+                std::string tokenText;
+                tokenText.reserve(size);
+                for (uint8 i = 0; i < size; ++i)
+                {
+                    unsigned char ch = static_cast<unsigned char>(token[i]);
+                    if (std::isdigit(ch))
+                        tokenText.push_back(static_cast<char>(ch));
+                }
+
                 uint32 tokenWindow = sConfigMgr->GetIntDefault("Auth2FA.TokenWindow", 1);
-                tokenValidation = Skyfire::Auth::TOTP::ValidateLoginToken(
-                    _tokenKey, std::string(&token[0]), tokenWindow);
+                tokenValidation = Skyfire::Auth::TOTP::ValidateToken(
+                    _tokenKey, tokenText, tokenWindow, _tokenLastUsedStep);
                 if (!tokenValidation.Success)
                 {
                     QueueLogonProofFailure(socket());
@@ -688,6 +701,12 @@ bool AuthSocket::_HandleLogonProof()
                         socket().getRemoteAddress().c_str(), socket().getRemotePort(), _login.c_str());
                     return false;
                 }
+
+                PreparedStatement* stepStmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_ACCOUNT_TWOFACTOR_LAST_USED_STEP);
+                stepStmt->setUInt64(0, tokenValidation.TimeStep);
+                stepStmt->setUInt32(1, _accountId);
+                LoginDatabase.DirectExecute(stepStmt);
+                _tokenLastUsedStep = tokenValidation.TimeStep;
             }
         }
 

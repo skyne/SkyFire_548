@@ -167,6 +167,13 @@ bool MySQLConnection::Execute(const char* sql)
     return true;
 }
 
+uint64 MySQLConnection::ExecuteAffected(const char* sql)
+{
+    if (!Execute(sql))
+        return 0;
+    return uint64(mysql_affected_rows(m_Mysql));
+}
+
 bool MySQLConnection::Execute(PreparedStatement* stmt)
 {
     if (!m_Mysql)

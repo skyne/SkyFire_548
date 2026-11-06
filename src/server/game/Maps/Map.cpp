@@ -20,6 +20,7 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Pet.h"
+#include "RaidScale.h"
 #include "ScriptMgr.h"
 #include "Transport.h"
 #include "Vehicle.h"
@@ -495,6 +496,7 @@ bool Map::AddPlayerToMap(Player* player)
     player->UpdateObjectVisibility(false);
     player->UpdatePhasing();
     sScriptMgr->OnPlayerEnterMap(this, player);
+    RaidScale::OnPlayersChanged(this);
     return true;
 }
 
@@ -2712,6 +2714,45 @@ void Map::RemoveAllObjectsInRemoveList()
     //SF_LOG_DEBUG("maps", "Object remover 2 check.");
 }
 
+namespace
+{
+    struct CreatureVisitor
+    {
+        void (*fn)(Creature*, void*);
+        void* data;
+
+        template<class T>
+        void Visit(GridRefManager<T>&) { }
+
+        void Visit(CreatureMapType& creatures)
+        {
+            for (CreatureMapType::iterator itr = creatures.begin(); itr != creatures.end(); ++itr)
+                if (Creature* creature = itr->GetSource())
+                    fn(creature, data);
+        }
+    };
+}
+
+void Map::ForEachCreature(void (*fn)(Creature*, void*), void* data)
+{
+    CreatureVisitor visitor = { fn, data };
+    for (uint32 x = 0; x < MAX_NUMBER_OF_GRIDS; ++x)
+    {
+        for (uint32 y = 0; y < MAX_NUMBER_OF_GRIDS; ++y)
+        {
+            NGridType* grid = i_grids[x][y];
+            if (!grid)
+                continue;
+
+            // Active creatures live in the world container; the rest live in the grid container.
+            TypeContainerVisitor<CreatureVisitor, GridTypeMapContainer> gridVisitor(visitor);
+            TypeContainerVisitor<CreatureVisitor, WorldTypeMapContainer> worldVisitor(visitor);
+            grid->VisitAllGrids(gridVisitor);
+            grid->VisitAllGrids(worldVisitor);
+        }
+    }
+}
+
 uint32 Map::GetPlayersCountExceptGMs() const
 {
     uint32 count = 0;
@@ -2860,6 +2901,7 @@ template void Map::RemoveFromMap(AreaTrigger*, bool);
 InstanceMap::InstanceMap(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode, Map* _parent)
     : Map(id, expiry, InstanceId, SpawnMode, _parent),
     m_resetAfterUnload(false), m_unloadWhenEmpty(false),
+    m_raidScaleLocked(false), m_raidScalePlayers(0),
     i_data(NULL), i_script_id(0)
 {
     //lets initialize visibility distance for dungeons

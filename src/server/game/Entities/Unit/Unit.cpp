@@ -1404,6 +1404,12 @@ void Unit::_UpdateAutoRepeatSpell()
     // castroutine
     if (isAttackReady(WeaponAttackType::RANGED_ATTACK))
     {
+        // Shoot starts a 1500 ms global cooldown, but the first auto-repeat delay is only 500 ms.
+        // CheckCast then fails with SPELL_FAILED_NOT_READY and the channel is cancelled before the first shot.
+        if (GetTypeId() == TypeID::TYPEID_PLAYER &&
+            ToPlayer()->GetGlobalCooldownMgr().HasGlobalCooldown(m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo))
+            return;
+
         SpellCastResult const autoResult = m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->CheckCast(true);
         if (autoResult != SpellCastResult::SPELL_CAST_OK)
         {

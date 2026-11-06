@@ -31,6 +31,7 @@ class Object;
 class WorldObject;
 class TempSummon;
 class Player;
+class Creature;
 class CreatureGroup;
 struct ScriptInfo;
 struct ScriptAction;
@@ -436,6 +437,7 @@ public:
     TempSummon* SummonCreature(uint32 entry, Position const& pos, SummonPropertiesEntry const* properties = NULL, uint32 duration = 0, Unit* summoner = NULL, uint32 spellId = 0, uint32 vehId = 0);
     void SummonCreatureGroup(uint8 group, std::list<TempSummon*>* list = NULL);
     Creature* GetCreature(uint64 guid);
+    void ForEachCreature(void (*fn)(Creature*, void*), void* data);
     GameObject* GetGameObject(uint64 guid);
     Transport* GetTransport(uint64 guid);
     DynamicObject* GetDynamicObject(uint64 guid);
@@ -674,10 +676,17 @@ public:
     uint32 GetMaxPlayers() const;
     uint32 GetMaxResetDelay() const;
 
+    void LockRaidScale(uint32 players) { m_raidScaleLocked = true; m_raidScalePlayers = players; }
+    void UnlockRaidScale() { m_raidScaleLocked = false; m_raidScalePlayers = 0; }
+    bool IsRaidScaleLocked() const { return m_raidScaleLocked; }
+    uint32 GetRaidScalePlayers() const { return m_raidScalePlayers; }
+
     virtual void InitVisibilityDistance() OVERRIDE;
 private:
     bool m_resetAfterUnload;
     bool m_unloadWhenEmpty;
+    bool m_raidScaleLocked;
+    uint32 m_raidScalePlayers;
     InstanceScript* i_data;
     uint32 i_script_id;
 };

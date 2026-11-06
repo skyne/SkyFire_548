@@ -23,6 +23,7 @@
 #include "MovementStructures.h"
 #include "MoveSpline.h"
 #include "ObjectAccessor.h"
+#include "RaidScale.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "OutdoorPvP.h"
@@ -351,6 +352,8 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
             GetMotionMaster()->GetCurrentMovementGeneratorType() == RANDOM_MOTION_TYPE)
             creature->SetHomePosition(GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
 
+        RaidScale::OnCreatureEnterCombat(creature);
+
         if (enemy)
         {
             if (IsAIEnabled)
@@ -388,6 +391,7 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
 
 void Unit::ClearInCombat()
 {
+    bool wasInCombat = IsInCombat();
     m_CombatTimer = 0;
     RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT);
 
@@ -396,6 +400,9 @@ void Unit::ClearInCombat()
     {
         if (creature->GetCreatureTemplate() && creature->GetCreatureTemplate()->unit_flags & UNIT_FLAG_IMMUNE_TO_PC)
             SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC); // set immunity state to the one from db on evade
+
+        if (wasInCombat)
+            RaidScale::OnCreatureLeaveCombat(creature);
 
         ClearUnitState(UNIT_STATE_ATTACK_PLAYER);
         if (HasFlag(OBJECT_FIELD_DYNAMIC_FLAGS, UNIT_DYNFLAG_TAPPED))

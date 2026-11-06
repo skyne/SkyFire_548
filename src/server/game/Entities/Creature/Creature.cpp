@@ -9,6 +9,7 @@
 #include "CellImpl.h"
 #include "Common.h"
 #include "Creature.h"
+#include "RaidScale.h"
 #include "CreatureAI.h"
 #include "CreatureAISelector.h"
 #include "CreatureGroups.h"
@@ -1089,6 +1090,7 @@ void Creature::SelectLevel(const CreatureTemplate* cinfo)
 
     SetModifierValue(UNIT_MOD_HEALTH, BASE_VALUE, (float)health);
     SetModifierValue(UNIT_MOD_MANA, BASE_VALUE, (float)mana);
+    RaidScale::ApplyHealth(this);
 
     //damage
     //float damagemod = _GetDamageMod(rank);      // Set during loading templates into dmg_multiplier field

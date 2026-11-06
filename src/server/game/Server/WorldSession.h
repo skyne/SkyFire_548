@@ -369,6 +369,33 @@ public:
     // have no client to ack the teleport.
     // Returns true if a teleport was finalized.
     bool FinalizeBotTeleport();
+
+    // Bot teleports onto a map this process does not own. The player stays
+    // here until the module saves the destination and logs the bot out, so
+    // the node that owns the map can load them. There is no client to hand off.
+    void SetPendingBotMigration(uint32 mapId, float x, float y, float z, float o)
+    {
+        m_botMigrationPending = true;
+        m_botMigrationMap = mapId;
+        m_botMigrationX = x;
+        m_botMigrationY = y;
+        m_botMigrationZ = z;
+        m_botMigrationO = o;
+    }
+    bool HasPendingBotMigration() const { return m_botMigrationPending; }
+    void ClearPendingBotMigration() { m_botMigrationPending = false; }
+    bool TakePendingBotMigration(uint32& mapId, float& x, float& y, float& z, float& o)
+    {
+        if (!m_botMigrationPending)
+            return false;
+        mapId = m_botMigrationMap;
+        x = m_botMigrationX;
+        y = m_botMigrationY;
+        z = m_botMigrationZ;
+        o = m_botMigrationO;
+        m_botMigrationPending = false;
+        return true;
+    }
     // Creates a character on this session's account and saves it. When
     // specializationId is non-zero and the level allows it, that specialization
     // and its spells are learned. Returns the new character's low GUID, or 0.
@@ -1304,6 +1331,12 @@ private:
     BotActivity m_botActivity;
     uint32 m_botSlowAccumulator;
     uint32 m_botSlowInterval;
+    bool m_botMigrationPending;
+    uint32 m_botMigrationMap;
+    float m_botMigrationX;
+    float m_botMigrationY;
+    float m_botMigrationZ;
+    float m_botMigrationO;
     LocaleConstant m_sessionDbcLocale;
     LocaleConstant m_sessionDbLocaleIndex;
     uint32 m_latency;

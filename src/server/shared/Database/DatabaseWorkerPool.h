@@ -222,6 +222,19 @@ public:
         t->Unlock();
     }
 
+    //! Same as DirectExecute, but returns mysql_affected_rows so a conditional
+    //! UPDATE can be used as a compare-and-swap.
+    uint64 DirectExecuteAffected(const char* sql)
+    {
+        if (!sql)
+            return 0;
+
+        T* t = GetFreeConnection();
+        uint64 changed = t->ExecuteAffected(sql);
+        t->Unlock();
+        return changed;
+    }
+
     //! Directly executes a one-way SQL operation in string format -with variable args-, that will block the calling thread until finished.
     //! This method should only be used for queries that are only executed once, e.g during startup.
     void DirectPExecute(const char* sql, ...)

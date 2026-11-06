@@ -17,7 +17,6 @@
 #include "ScriptedCreature.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
-#include "SpellMgr.h"
 
 #include "SmartScriptMgr.h"
 

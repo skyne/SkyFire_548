@@ -31,6 +31,7 @@
 #include "Pet.h"
 #include "PetAI.h"
 #include "Player.h"
+#include "RaidScale.h"
 #include "QuestDef.h"
 #include "ReputationMgr.h"
 #include "Spell.h"
@@ -559,6 +560,7 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
 
     // Script Hook For CalculateSpellDamageTaken -- Allow scripts to change the Damage post class mitigation calculations
     sScriptMgr->ModifySpellDamageTaken(damageInfo->target, damageInfo->attacker, damage);
+    RaidScale::ScaleDamage(damageInfo->attacker, damage);
 
     // Calculate absorb resist
     if (damage > 0)
@@ -658,6 +660,7 @@ void Unit::CalculateMeleeDamage(Unit* victim, uint32 damage, CalcDamageInfo* dam
 
     // Script Hook For CalculateMeleeDamage -- Allow scripts to change the Damage pre class mitigation calculations
     sScriptMgr->ModifyMeleeDamage(damageInfo->target, damageInfo->attacker, damage);
+    RaidScale::ScaleDamage(damageInfo->attacker, damage);
 
     // Calculate armor reduction
     if (IsDamageReducedByArmor((SpellSchoolMask)(damageInfo->damageSchoolMask)))

@@ -26,6 +26,7 @@
 #include "Opcodes.h"
 #include "Pet.h"
 #include "Player.h"
+#include "RaidScale.h"
 #include "RuntimeMetrics.h"
 #include "ScriptMgr.h"
 #include "SharedDefines.h"
@@ -1116,8 +1117,8 @@ void Spell::SelectImplicitConeTargets(SpellEffIndex effIndex, SpellImplicitTarge
         if (!targets.empty())
         {
             // Other special target selection goes here
-            if (uint32 maxTargets = m_spellValue->MaxAffectedTargets)
-                Skyfire::Containers::RandomResizeList(targets, maxTargets);
+            if (m_spellValue->MaxAffectedTargets)
+                Skyfire::Containers::RandomResizeList(targets, RaidScale::ScaleTargetCap(m_caster, m_spellValue->MaxAffectedTargets));
 
             // for compability with older code - add only unit and go targets
             /// @todo remove this
@@ -1391,8 +1392,8 @@ void Spell::SelectImplicitAreaTargets(SpellEffIndex effIndex, SpellImplicitTarge
         }
 
         // Other special target selection goes here
-        if (uint32 maxTargets = m_spellValue->MaxAffectedTargets)
-            Skyfire::Containers::RandomResizeList(unitTargets, maxTargets);
+        if (m_spellValue->MaxAffectedTargets)
+            Skyfire::Containers::RandomResizeList(unitTargets, RaidScale::ScaleTargetCap(m_caster, m_spellValue->MaxAffectedTargets));
 
         for (std::list<Unit*>::iterator itr = unitTargets.begin(); itr != unitTargets.end(); ++itr)
             AddUnitTarget(*itr, effMask, false);
@@ -1400,8 +1401,8 @@ void Spell::SelectImplicitAreaTargets(SpellEffIndex effIndex, SpellImplicitTarge
 
     if (!gObjTargets.empty())
     {
-        if (uint32 maxTargets = m_spellValue->MaxAffectedTargets)
-            Skyfire::Containers::RandomResizeList(gObjTargets, maxTargets);
+        if (m_spellValue->MaxAffectedTargets)
+            Skyfire::Containers::RandomResizeList(gObjTargets, RaidScale::ScaleTargetCap(m_caster, m_spellValue->MaxAffectedTargets));
 
         for (std::list<GameObject*>::iterator itr = gObjTargets.begin(); itr != gObjTargets.end(); ++itr)
             AddGOTarget(*itr, effMask);

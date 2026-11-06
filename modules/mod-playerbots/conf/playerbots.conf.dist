@@ -1,0 +1,628 @@
+[worldserver]
+
+########################################
+# mod-playerbots configuration
+########################################
+#
+#    Playerbots.Enable
+#        Description: Master switch for the playerbots module.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+Playerbots.Enable = 0
+
+#
+#    Playerbots.RandomBots.Enable
+#        Description: Allow the random-bot pool to populate the world with bots
+#                     used for testing LFG/LFR/RBG queues and open-world activity.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+Playerbots.RandomBots.Enable = 0
+
+#
+#    Playerbots.RandomBots.MaxBots
+#        Description: Maximum number of random bots kept online at once.
+#                     On a cluster this is one shared cap, not per node. A
+#                     node only logs in characters saved on a map it owns, and
+#                     it will not fill back up after those bots move to a map
+#                     another node owns. Crossing nodes logs the bot out so
+#                     the owner can pick it up, still inside this cap.
+#                     Account create and wipe run only on the node that owns
+#                     Eastern Kingdoms (map 0).
+#        Default:     0
+
+Playerbots.RandomBots.MaxBots = 0
+
+#
+#    Playerbots.RandomBots.AccountPrefix
+#        Description: Only characters that belong to accounts whose username
+#                     starts with this prefix are eligible for the random-bot
+#                     pool. Create dedicated bot accounts (e.g. RNDBOT1, RNDBOT2)
+#                     so real player characters are never used as bots.
+#        Default:     "RNDBOT"
+
+Playerbots.RandomBots.AccountPrefix = "RNDBOT"
+
+#
+#    Playerbots.DeleteRandomBotAccounts
+#        Description: When set to 1, worldserver startup deletes every account
+#                     whose username starts with AccountPrefix (and all of their
+#                     characters), then skips AutoCreate.OnStartup for that boot.
+#                     After the wipe finishes, set this back to 0 and restart (or
+#                     run .playerbots create) to rebuild the pool. Mid-session
+#                     wipe: .playerbots wipe confirm
+#        Default:     0 - (Disabled)
+#                     1 - (Wipe on next startup)
+
+Playerbots.DeleteRandomBotAccounts = 0
+
+#
+#    Playerbots.DeleteOrphanCharacters
+#        Description: On startup, fully delete characters whose account no
+#                     longer exists in the auth database (e.g. bot accounts
+#                     wiped while the character deletes were still queued).
+#                     Characters on account 0 (CharDelete.Method = 1 soft
+#                     deletes) are left alone.
+#        Default:     1 - (Enabled)
+#                     0 - (Disabled)
+
+Playerbots.DeleteOrphanCharacters = 1
+
+#
+#    Playerbots.RandomBots.LoginInterval
+#        Description: Minimum milliseconds between *starting* a new async random
+#                     bot login. DB load runs on a worker thread; LoadFromDB into
+#                     the world is paced by LoginsPerTick. Lower = fill the pool
+#                     faster (more in-flight queries). Does NOT control gear init
+#                     (see Playerbots.Init.PerTick).
+#        Default:     250
+
+Playerbots.RandomBots.LoginInterval = 250
+
+#
+#    Playerbots.RandomBots.MaxPendingLogins
+#        Description: How many random-bot character logins may be in flight at
+#                     once (query holders waiting on the DB). Higher fills faster
+#                     but uses more DB concurrency. Clamped to 1–64.
+#        Default:     8
+
+Playerbots.RandomBots.MaxPendingLogins = 8
+
+#
+#    Playerbots.RandomBots.LoginsPerTick
+#        Description: Max character LoadFromDB / map-add completions per world
+#                     tick for the random pool. Keep at 1 to avoid multi-bot
+#                     freezes; raise only if the world tick can absorb it.
+#                     Clamped to 1–10. This is the knob that spreads hitch cost —
+#                     Init.PerTick is only for `.playerbots init` gear jobs.
+#        Default:     1
+
+Playerbots.RandomBots.LoginsPerTick = 1
+
+#
+#    Playerbots.RandomBotJoinLfg
+#        Description: When 1, ungrouped random bots JoinLfg to fill real players
+#                     already in the dungeon finder queue (same dungeons / level
+#                     band). Bot tanks are skipped if a player queued as tank;
+#                     bot healers are skipped if a player queued as healer. DPS
+#                     bots are never skipped by that safety. Bot-only LFG groups
+#                     are still ejected. Grouped bots continue to answer party
+#                     role checks / proposals via HandleLfg.
+#                     Console: each join logs at INFO (modules).
+#        Default:     0 - (Disabled)
+#                     1 - (Fill LFG for queued players)
+
+Playerbots.RandomBotJoinLfg = 0
+
+#
+#    Playerbots.RandomBotJoinLfg.MaxBots
+#        Description: Cap on bots kept in LFG fill. Actual joins are also limited
+#                     to remaining 5-man slots (e.g. solo tank only needs 4).
+#        Default:     10
+
+Playerbots.RandomBotJoinLfg.MaxBots = 10
+
+#
+#    Playerbots.RandomBotJoinLfg.LevelRange
+#        Description: Max |botLevel - playerLevel| when picking LFG fill bots.
+#        Default:     5
+
+Playerbots.RandomBotJoinLfg.LevelRange = 5
+
+########################################
+# Bot auto-creation
+########################################
+#
+# The auto-creator provisions dedicated bot accounts (AccountPrefix + n, e.g.
+# RNDBOT1..RNDBOTn) and fills them with characters generated according to the
+# faction and role ratios below. Run it with the ".playerbots create" command,
+# or set Playerbots.AutoCreate.OnStartup = 1 to run it once when the world boots.
+# It is incremental and idempotent: existing accounts/characters are reused, and
+# only the missing ones are created.
+#
+
+#
+#    Playerbots.AutoCreate.OnStartup
+#        Description: Run the auto-creator automatically when the world starts.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+Playerbots.AutoCreate.OnStartup = 0
+
+#
+#    Playerbots.AutoCreate.AccountCount
+#        Description: Number of bot accounts to ensure exist. Accounts are named
+#                     <AccountPrefix><n> for n = 1..AccountCount (RNDBOT1..).
+#                     This is independent of RandomBots.MaxBots (online pool size).
+#                     After a wipe, set this to the pool size you want (e.g. 250)
+#                     before .playerbots create / AutoCreate.OnStartup.
+#        Default:     0
+
+Playerbots.AutoCreate.AccountCount = 0
+
+#
+#    Playerbots.AutoCreate.AccountPassword
+#        Description: Password assigned to newly created bot accounts.
+#        Default:     "password"
+
+Playerbots.AutoCreate.AccountPassword = "password"
+
+#
+#    Playerbots.AutoCreate.CharactersPerAccount
+#        Description: Number of characters to create on each bot account. The
+#                     realm limit is 11 characters per account.
+#        Default:     1
+
+Playerbots.AutoCreate.CharactersPerAccount = 1
+
+#
+#    Playerbots.AutoCreate.AlliancePct
+#        Description: Percentage (0-100) of created characters that are Alliance;
+#                     the remainder are Horde.
+#        Default:     50
+
+Playerbots.AutoCreate.AlliancePct = 50
+
+#
+#    Playerbots.AutoCreate.TankPct
+#    Playerbots.AutoCreate.HealerPct
+#        Description: Percentage (0-100) of created characters assigned the tank
+#                     and healer roles. The remainder become damage dealers. The
+#                     role picks a class capable of filling it. TankPct + HealerPct
+#                     should be <= 100.
+#        Default:     20 / 20
+
+Playerbots.AutoCreate.TankPct = 20
+Playerbots.AutoCreate.HealerPct = 20
+
+#
+#    Playerbots.AutoCreate.Level
+#    Playerbots.AutoCreate.MinLevel
+#    Playerbots.AutoCreate.MaxLevel
+#        Description: Level band for newly created bots, and for
+#                     `.playerbots init … relevel` / `tele`. Min/Max default to
+#                     AutoCreate.Level when omitted. When Min == Max every new
+#                     (or relevelling) bot is that level (e.g. 80/80). When the
+#                     range spans multiple levels, each bot rolls uniformly.
+#                     Normal `.playerbots init` without `relevel` does not
+#                     change level. Optional `tele`/`teleport` scatters after
+#                     gear using the bot's final level. Death Knights are
+#                     excluded from auto-creation.
+#        Default:     1 / 1 / 1
+
+Playerbots.AutoCreate.Level = 1
+Playerbots.AutoCreate.MinLevel = 1
+Playerbots.AutoCreate.MaxLevel = 1
+
+#
+#    Playerbots.AutoCreate.InitOnCreate
+#        Description: Ignored by `.playerbots create` and startup auto-create:
+#                     initing every new character inside one call blocks the
+#                     world loop (about 2 s per bot) and idles out real players.
+#                     Create only writes characters; gear/spells run through
+#                     the per-tick init queue on first world login (random
+#                     pool / .playerbots add).
+#                     Use `.playerbots init all` on online bots to re-gear anytime.
+#        Default:     0
+
+Playerbots.AutoCreate.InitOnCreate = 0
+
+#
+#    Playerbots.AutoCreate.TeleportOnInit
+#        Description: When 1 (default), the first gear init for a new bot
+#                     (InitOnCreate or deferred first world login) also scatters
+#                     them to a level/faction-safe open-world anchor. Levels 1–5
+#                     are excluded and stay at their race spawn. Does not affect
+#                     later `.playerbots init` — pass `tele`/`teleport` on that
+#                     command when you want it again (levels 1–5 then go to
+#                     homebind / hearth).
+#                     Alt bots (characters not on an AccountPrefix account) are
+#                     never initialized or teleported automatically, only by an
+#                     explicit `.playerbots init`.
+#        Default:     1
+
+Playerbots.AutoCreate.TeleportOnInit = 1
+
+#
+#    Playerbots.Init.PerTick
+#        Description: How many bots `.playerbots init all` (and queued group
+#                     inits) process each world tick. This is gear/talent/spell
+#                     rebuild only — not random-bot world login. For login pacing
+#                     use RandomBots.LoginsPerTick / LoginInterval /
+#                     MaxPendingLogins. Higher init = faster finish, more hitch
+#                     risk. Clamped to 1–50.
+#        Default:     5
+
+Playerbots.Init.PerTick = 5
+
+########################################
+# Gear (create auto-init + .playerbots init)
+########################################
+#
+#    Playerbots.Gear.MinQuality
+#    Playerbots.Gear.MaxQuality
+#        Description: ITEM_QUALITY band used when gearing bots (1=normal,
+#                     2=uncommon, 3=rare, 4=epic, 5=legendary). Create auto-inits
+#                     with this band; .playerbots init uses MaxQuality unless you
+#                     pass a quality token (rare/epic/…). Among the top ilvl
+#                     candidates for each slot, one is picked at random.
+#        Default:     2 / 4
+
+Playerbots.Gear.MinQuality = 2
+Playerbots.Gear.MaxQuality = 4
+
+########################################
+# autogear / maintenance chat commands
+########################################
+#
+#    Playerbots.AutoGear.Command
+#        Description: Allow the `autogear` whisper/party order. In-game syntax
+#                     (an argument can only request at or below the limits):
+#                       autogear          - upgrade worn gear slot by slot
+#                       autogear green    - cap quality (white/green/blue/
+#                                           purple/orange)
+#                       autogear 450      - cap item level
+#                       autogear match    - cap at the issuer's average ilvl
+#                       autogear reset    - wipe worn gear and regear from
+#                                           scratch (combines with the above)
+#        Default:     1
+#
+#    Playerbots.AutoGear.AltBots
+#        Description: Allow `autogear` on alt bots (characters that are neither
+#                     in the random pool nor on an AccountPrefix account).
+#        Default:     1
+#
+#    Playerbots.AutoGear.QualityLimit
+#        Description: Highest ITEM_QUALITY autogear may equip (1=normal,
+#                     2=uncommon, 3=rare, 4=epic, 5=legendary).
+#        Default:     4
+#
+#    Playerbots.AutoGear.ItemLevelLimit
+#        Description: Highest item level autogear may equip (0 = no limit).
+#                     Gear is still limited to items the bot's level can use.
+#        Default:     0
+#
+#    Playerbots.AutoGear.StatWeights
+#        Description: How autogear scores a piece. 1 = the spec's stat weights
+#                     (the same ones maintenance uses for enchants and gems):
+#                     weighted stats, random suffixes (as rolled on worn
+#                     gear, their average on candidates), each socket as the
+#                     best gem for it, and weapon DPS for physical specs.
+#                     Stat caps are approximated from the spec's priority
+#                     page: 7.5% hit / 7.5% expertise (15% for tanks), 15%
+#                     spell hit for casters (spirit counts for Balance,
+#                     Shadow, Elemental), Fury hit to 26.5%, Balance haste
+#                     soft cap 24.22%, healer haste breakpoints. Rating past
+#                     a hard cap is worth 0.2 of its weight, measured on the bot's own
+#                     ratings without the piece it would replace;
+#                     `autogear reset` then takes the best piece instead of a
+#                     random pick among the top ones. 0 = item level (half
+#                     for a piece with another spec's primary stat).
+#        Default:     1
+
+Playerbots.AutoGear.Command = 1
+Playerbots.AutoGear.AltBots = 1
+Playerbots.AutoGear.QualityLimit = 4
+Playerbots.AutoGear.ItemLevelLimit = 0
+Playerbots.AutoGear.StatWeights = 1
+
+#
+#    Playerbots.Maintenance.Command
+#        Description: Allow the `maintenance` whisper/party order: learn
+#                     spells and proficiencies, apply recommended talents and
+#                     glyphs, riding and mounts, hunter pets, a bag in every
+#                     empty bag slot, enchants and gems, repair. Spec and gear
+#                     are kept.
+#        Default:     1
+#
+#    Playerbots.Maintenance.Enchants
+#    Playerbots.Maintenance.Gems
+#        Description: `maintenance` enchants the equipped gear and fills its
+#                     empty sockets, picking the best enchant / gem for the
+#                     bot's spec from the game data (enchanting recipes,
+#                     scrolls, armor kits, leg armor, shoulder inscriptions,
+#                     belt buckles; gem items). Choices are scored with stat
+#                     weights from each spec's stat priority (Wowhead MoP
+#                     pre-raid list): the first stat weighs 1, each rank down
+#                     loses StatRankStep. Gems take the socket bonus into
+#                     account. Enchants needing a profession (ring enchants,
+#                     secret inscriptions, tinkers) and profession gems are
+#                     skipped; gems need an item level up to the gear's, and
+#                     items sold for reputation (inscriptions, some gems) need
+#                     the bot to have that reputation.
+#                     Gems and enchants respect the same stat caps as
+#                     autogear, and caps Wowhead says to reach first (hit,
+#                     expertise, spell hit, healer haste breakpoints) are
+#                     filled before any other stat: below them those stats
+#                     count ten times. No hit gems once hit capped. Balance's
+#                     haste soft cap is only a ceiling. An existing enchant
+#                     is replaced only by a better one; gems never replace
+#                     socketed ones.
+#        Default:     1
+#
+#    Playerbots.Maintenance.EnchantBudgetShare
+#        Description: Most an enchant may be worth, as a share of the gear's
+#                     stat budget (RandPropPoints of an epic chest at the
+#                     item's level), counted in primary-stat points (rating
+#                     and spirit half, stamina 2/3, procs at their uptime).
+#                     Keeps high-level or test enchants off low-level gear
+#                     even when their source data claims a low level. Lower
+#                     it if bots still get enchants too strong for their gear.
+#        Default:     1.0
+#
+#    Playerbots.Maintenance.StatRankStep
+#        Description: Weight lost per rank down a spec's stat priority
+#                     (0.05: 1, 0.95, 0.90, ...). Stats a spec does not list
+#                     weigh 0.
+#        Default:     0.05
+#
+#    Playerbots.Maintenance.BagEntry
+#        Description: Item entry of the bag `maintenance` puts in each empty
+#                     bag slot (bags already there are kept). 0 = no bags.
+#                     A bot without its PvP gear bag yet keeps one slot free
+#                     for it (`.playerbots init` / `autogear reset` add it).
+#                     Must be a general bag: a profession bag (enchanting,
+#                     herbs, ...) holds only its own kind of item.
+#        Default:     82446 - (Royal Satchel, 28 slots)
+#
+#    Playerbots.AltMaintenance.Spells
+#    Playerbots.AltMaintenance.Talents
+#    Playerbots.AltMaintenance.Glyphs
+#    Playerbots.AltMaintenance.Mounts
+#    Playerbots.AltMaintenance.Pet
+#    Playerbots.AltMaintenance.Bags
+#    Playerbots.AltMaintenance.Enchants
+#    Playerbots.AltMaintenance.Gems
+#        Description: Which parts of `maintenance` run on alt bots. Talents
+#                     replaces the alt's talent choices with the recommended
+#                     build. Alts only get enchants on items with none (their
+#                     own enchants are never replaced).
+#        Default:     1
+
+Playerbots.Maintenance.Command = 1
+Playerbots.AltMaintenance.Spells = 1
+Playerbots.AltMaintenance.Talents = 1
+Playerbots.AltMaintenance.Glyphs = 1
+Playerbots.AltMaintenance.Mounts = 1
+Playerbots.AltMaintenance.Pet = 1
+Playerbots.AltMaintenance.Bags = 1
+Playerbots.AltMaintenance.Enchants = 1
+Playerbots.AltMaintenance.Gems = 1
+Playerbots.Maintenance.BagEntry = 82446
+Playerbots.Maintenance.Enchants = 1
+Playerbots.Maintenance.Gems = 1
+Playerbots.Maintenance.StatRankStep = 0.05
+Playerbots.Maintenance.EnchantBudgetShare = 1.0
+
+#
+#    Playerbots.Loot.NeedUpgradePercent
+#        Description: Group loot rolls: a bot rolls Need only on weapons and armor it can
+#                     use, of its class's own armor type (cloth/leather/mail/plate, mail
+#                     and plate from level 40), that beat what it wears in that slot by at
+#                     least this much by its spec's stat weights (the weaker of two ring,
+#                     trinket or dual-wield slots; main hand + off hand for a two-hander).
+#                     Greed on everything else.
+#        Default:     2 (percent)
+#
+#    Playerbots.Loot.CapBoost
+#        Description: In loot rolls, stats below a cap the bot must reach (hit,
+#                     expertise, spell hit, healer haste breakpoints) count this many times
+#                     their weight, so a capped stat matters without making a caster need
+#                     a tank item for its hit. Maintenance uses 10 for gems and enchants.
+#        Default:     1.15
+
+Playerbots.Loot.NeedUpgradePercent = 2
+Playerbots.Loot.CapBoost = 1.15
+
+#
+#    Playerbots.AutoEquip.Enable
+#        Description: Bots equip items from their bags that are upgrades, by the same rule
+#                     as a Need roll (Playerbots.Loot.NeedUpgradePercent and .CapBoost):
+#                     right after looting, winning a roll or a quest reward, and every
+#                     Playerbots.AutoEquip.Interval seconds out of combat (trades, mail,
+#                     purchases). Not in battlegrounds or arenas (the PvP set is worn
+#                     there); the PvP gear bag is never searched. The replaced piece goes
+#                     to the bag slot the new one came from.
+#        Default:     1
+#
+#    Playerbots.AutoEquip.Alts
+#        Description: Also on alt bots (characters of real players). Off by default: alts
+#                     change only when their player orders it ("equip upgrades").
+#        Default:     0
+#
+#    Playerbots.AutoEquip.Interval
+#        Description: Seconds between bag checks out of combat (minimum 5).
+#        Default:     60
+
+Playerbots.AutoEquip.Enable = 1
+Playerbots.AutoEquip.Alts = 0
+Playerbots.AutoEquip.Interval = 60
+
+#
+#    Playerbots.Rest.HealthPct
+#    Playerbots.Rest.ManaPct
+#        Description: With nc +food, bots sit and regenerate when health or mana
+#                     falls below this percent. Enable/disable via chat: nc +food.
+#        Default:     50
+
+Playerbots.Rest.HealthPct = 50
+Playerbots.Rest.ManaPct = 50
+
+#
+#    Playerbots.Rest.AlmostFullHealth
+#    Playerbots.Rest.MediumMana
+#        Description: Between pulls (nc +food), the party holds follow/engage until
+#                     nearby allies are at least this healthy / have this much mana
+#                     (or finish eating/drinking). Bots below these also drink while
+#                     waiting, even if above Rest.HealthPct / Rest.ManaPct.
+#        Default:     85 / 40
+
+Playerbots.Rest.AlmostFullHealth = 85
+Playerbots.Rest.MediumMana = 40
+
+#
+#    Playerbots.SaveMana.Threshold
+#        Description: With co +save mana, healers skip expensive heals below this
+#                     mana percent unless the ally is critically low.
+#        Default:     60
+
+Playerbots.SaveMana.Threshold = 60
+
+#
+#    Playerbots.Threat.ThrottlePct
+#        Description: With co +threat (default on for DPS), pause damage (spells and
+#                     melee) when the bot's threat reaches this percent of the tank's
+#                     threat on the target (falls back to current top threat).
+#        Default:     80
+
+Playerbots.Threat.ThrottlePct = 80
+
+#
+#    Playerbots.Flee.Enabled
+#    Playerbots.Flee.Distance
+#        Description: Ranged bots kite with BotFleeManager when an enemy is too
+#                     close for casting. Distance is the sample radius for flee
+#                     points. Chat order `flee` still teleports to the issuer.
+#        Default:     1 / 20
+
+Playerbots.Flee.Enabled = 1
+Playerbots.Flee.Distance = 20
+
+#
+#    Playerbots.WaitForAttack.Seconds
+#        Description: With co +wait for attack (default on for DPS), non-tanks
+#                     delay opening damage this many seconds after combat starts
+#                     so the tank can establish threat. Fight-back still immediate.
+#        Default:     5
+
+Playerbots.WaitForAttack.Seconds = 5
+
+#
+#    Playerbots.Vendor.SellGreens
+#        Description: Vendor-dump unbound uncommon+ items (soulbound/quest/gear
+#                     keepers are skipped). Grays always sell. Not a real AH post.
+#                     Alt bots (characters not on an AccountPrefix account) sell
+#                     only grays on their own; more only on a `sell all` order.
+#        Default:     1
+
+Playerbots.Vendor.SellGreens = 1
+
+#
+#    Playerbots.Vendor.HubMaxDistance
+#        Description: Max yards to travel on the same map to a vendor hub when no
+#                     vendor is within the local 20y seek range.
+#        Default:     500
+
+Playerbots.Vendor.HubMaxDistance = 500
+
+#
+#    Playerbots.Quest.AutoPickReward
+#        Description: When turning in quests with a reward choice, pick the best
+#                     upgrade (else highest vendor price). 0 always takes slot 0.
+#        Default:     1
+
+Playerbots.Quest.AutoPickReward = 1
+
+#
+#    Playerbots.Activity.Enable
+#        Description: When 1, socket bots skip map updates on maps with no real
+#                     player (dormant) and only heartbeat every SlowInterval
+#                     when a real player is on the same map but farther than
+#                     ActiveRange (slow). Full speed when a real player is in
+#                     range, the bot is grouped with a real player, or the bot
+#                     is in a dungeon, raid, scenario, battleground, or arena
+#                     that already has a real player. 0 keeps every bot on the
+#                     normal tick.
+#        Default:     1 - (Enabled)
+
+Playerbots.Activity.Enable = 1
+
+#
+#    Playerbots.Activity.ActiveRange
+#        Description: Yards from a real player at which an ungrouped bot on the
+#                     same map runs at full speed. 0 uses that map's visibility
+#                     distance, so a bot the player can see is already active.
+#        Default:     0
+
+Playerbots.Activity.ActiveRange = 0
+
+#
+#    Playerbots.Activity.SlowInterval
+#        Description: Milliseconds between idle heartbeats for bots that share
+#                     a map with a real player but sit outside ActiveRange.
+#                     Those heartbeats only accept invites, finish a drink, or
+#                     teleport to a real group leader. Clamped to 1–60000.
+#        Default:     5000
+
+Playerbots.Activity.SlowInterval = 5000
+
+#
+#    Playerbots.Chat.Enable
+#        Description: Hand lines that are not bot orders to a chat provider.
+#                     No provider ships with the module. Register one (Ollama,
+#                     llama.cpp, anything that implements BotChatProvider) and
+#                     name it below. The world thread never waits on the model.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+Playerbots.Chat.Enable = 0
+
+#
+#    Playerbots.Chat.Provider
+#        Description: Name passed to RegisterBotChatProvider. "none" stays quiet.
+#        Default:     none
+
+Playerbots.Chat.Provider = "none"
+
+#
+#    Playerbots.Chat.Range
+#        Description: Yards at which one nearby bot hears /say. /yell uses
+#                     four times this. Clamped to 5–100.
+#        Default:     25
+
+Playerbots.Chat.Range = 25
+
+#
+#    Playerbots.Chat.Cooldown
+#        Description: Seconds before the same bot is offered another line.
+#                     Starts when the line is handed to the provider.
+#        Default:     8
+
+Playerbots.Chat.Cooldown = 8
+
+#
+#    Playerbots.Chat.Memory
+#        Description: Earlier lines kept for that bot and passed to the
+#                     provider as "Name: text". 0–32.
+#        Default:     8
+
+Playerbots.Chat.Memory = 8
+
+#
+#    Playerbots.Chat.MaxReplyLength
+#        Description: Reply length after newlines are flattened. Clamped to
+#                     20–255.
+#        Default:     200
+
+Playerbots.Chat.MaxReplyLength = 200
