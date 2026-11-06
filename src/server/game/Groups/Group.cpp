@@ -2460,9 +2460,14 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
         // offline member? don't let join
         if (!member)
             return GroupJoinBattlegroundResult::ERR_BATTLEGROUND_JOIN_FAILED;
-        // don't allow cross-faction join as group
+        // Don't allow a mixed-faction premade unless cross-faction battlegrounds are enabled.
+        // Arenas stay same-faction. With the flag off this check is the old one.
         if (member->GetTeam() != team)
-            return GroupJoinBattlegroundResult::ERR_BATTLEGROUND_JOIN_TIMED_OUT;
+        {
+            bool crossFactionBg = bgOrTemplate->isBattleground() && sWorld->GetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_CROSSFACTION_ENABLED);
+            if (!crossFactionBg)
+                return GroupJoinBattlegroundResult::ERR_BATTLEGROUND_JOIN_TIMED_OUT;
+        }
         // not in the same battleground level braket, don't let join
         PvPDifficultyEntry const* memberBracketEntry = GetBattlegroundBracketByLevel(bracketEntry->mapId, member->getLevel());
         if (memberBracketEntry != bracketEntry)

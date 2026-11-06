@@ -128,6 +128,7 @@ GroupQueueInfo* BattlegroundQueue::AddGroup(Player* leader, Group* grp, Battlegr
     ginfo->JoinTime = getMSTime();
     ginfo->RemoveInviteTime = 0;
     ginfo->Team = leader->GetTeam();
+    ginfo->OriginalTeam = ginfo->Team;
     ginfo->ArenaTeamRating = ArenaRating;
     ginfo->ArenaMatchmakerRating = MatchmakerRating;
     ginfo->OpponentsTeamRating = 0;
@@ -284,7 +285,11 @@ void BattlegroundQueue::RemovePlayer(uint64 guid, bool decreaseInvitedCount)
     // mostly people with the highest levels are in battlegrounds, thats why
     // we count from MAX_BATTLEGROUND_QUEUES - 1 to 0
 
-    uint32 index = (group->Team == HORDE) ? BG_QUEUE_PREMADE_HORDE : BG_QUEUE_PREMADE_ALLIANCE;
+    // Cross-faction invites rewrite Team to the scoreboard side. The group stays in the queue of the faction it joined.
+    uint32 queueTeam = group->Team;
+    if (!group->ArenaType && group->OriginalTeam && sWorld->GetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_CROSSFACTION_ENABLED))
+        queueTeam = group->OriginalTeam;
+    uint32 index = (queueTeam == HORDE) ? BG_QUEUE_PREMADE_HORDE : BG_QUEUE_PREMADE_ALLIANCE;
 
     for (int32 bracket_id_tmp = MAX_BATTLEGROUND_BRACKETS - 1; bracket_id_tmp >= 0 && bracket_id == -1; --bracket_id_tmp)
     {
@@ -470,6 +475,9 @@ large groups are disadvantageous, because they will be kicked first if invitatio
 */
 void BattlegroundQueue::FillPlayersToBG(Battleground* bg, BattlegroundBracketId bracket_id)
 {
+    if (FillXPlayersToBG(bracket_id, bg, false, bg->GetMinPlayersPerTeam(), bg->GetMaxPlayersPerTeam()))
+        return;
+
     int32 hordeFree = bg->GetFreeSlotsForTeam(HORDE);
     int32 aliFree = bg->GetFreeSlotsForTeam(ALLIANCE);
     uint8 BracketID = uint8(bracket_id);
@@ -748,10 +756,10 @@ void BattlegroundQueue::BattlegroundQueueUpdate(uint32 /*diff*/, BattlegroundTyp
 
             // now everything is set, invite players
             for (GroupsQueueType::const_iterator citr = m_SelectionPools[TEAM_ALLIANCE].SelectedGroups.begin(); citr != m_SelectionPools[TEAM_ALLIANCE].SelectedGroups.end(); ++citr)
-                InviteGroupToBG((*citr), bg, (*citr)->Team);
+                InviteGroupToBG((*citr), bg, SelectionSide(bg, TEAM_ALLIANCE, (*citr)->Team));
 
             for (GroupsQueueType::const_iterator citr = m_SelectionPools[TEAM_HORDE].SelectedGroups.begin(); citr != m_SelectionPools[TEAM_HORDE].SelectedGroups.end(); ++citr)
-                InviteGroupToBG((*citr), bg, (*citr)->Team);
+                InviteGroupToBG((*citr), bg, SelectionSide(bg, TEAM_HORDE, (*citr)->Team));
 
             if (!bg->HasFreeSlots())
                 bg->RemoveFromBGFreeSlotQueue();
@@ -803,7 +811,7 @@ void BattlegroundQueue::BattlegroundQueueUpdate(uint32 /*diff*/, BattlegroundTyp
             // invite those selection pools
             for (uint32 i = 0; i < BG_TEAMS_COUNT; i++)
                 for (GroupsQueueType::const_iterator citr = m_SelectionPools[TEAM_ALLIANCE + i].SelectedGroups.begin(); citr != m_SelectionPools[TEAM_ALLIANCE + i].SelectedGroups.end(); ++citr)
-                    InviteGroupToBG((*citr), bg2, (*citr)->Team);
+                    InviteGroupToBG((*citr), bg2, SelectionSide(bg2, TeamId(TEAM_ALLIANCE + i), (*citr)->Team));
 
             bg2->StartBattleground();
             //clear structures
@@ -816,7 +824,8 @@ void BattlegroundQueue::BattlegroundQueueUpdate(uint32 /*diff*/, BattlegroundTyp
     if (!isRated)
     {
         // if there are enough players in pools, start new battleground or non rated arena
-        if (CheckNormalMatch(bg_template, bracket_id, MinPlayersPerTeam, MaxPlayersPerTeam)
+        if (CheckCrossFactionMatch(bracket_id, bg_template, MinPlayersPerTeam, MaxPlayersPerTeam)
+            || CheckNormalMatch(bg_template, bracket_id, MinPlayersPerTeam, MaxPlayersPerTeam)
             || (bg_template->isArena() && CheckSkirmishForSameFaction(bracket_id, MinPlayersPerTeam)))
         {
             // we successfully created a pool
@@ -830,7 +839,7 @@ void BattlegroundQueue::BattlegroundQueueUpdate(uint32 /*diff*/, BattlegroundTyp
             // invite those selection pools
             for (uint32 i = 0; i < BG_TEAMS_COUNT; i++)
                 for (GroupsQueueType::const_iterator citr = m_SelectionPools[TEAM_ALLIANCE + i].SelectedGroups.begin(); citr != m_SelectionPools[TEAM_ALLIANCE + i].SelectedGroups.end(); ++citr)
-                    InviteGroupToBG((*citr), bg2, (*citr)->Team);
+                    InviteGroupToBG((*citr), bg2, SelectionSide(bg2, TeamId(TEAM_ALLIANCE + i), (*citr)->Team));
             // start bg
             bg2->StartBattleground();
         }

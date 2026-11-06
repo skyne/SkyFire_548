@@ -1080,6 +1080,7 @@ void World::LoadConfigSettings(bool reload)
     SetFloatConfig(WorldFloatConfigs::CONFIG_LISTEN_RANGE_YELL, sConfigMgr->GetFloatDefault("ListenRange.Yell", 300.0f));
 
     SetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_CAST_DESERTER, sConfigMgr->GetBoolDefault("Battleground.CastDeserter", true));
+    SetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_CROSSFACTION_ENABLED, sConfigMgr->GetBoolDefault("Battleground.CrossFaction.Enable", false));
     SetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_ENABLE, sConfigMgr->GetBoolDefault("Battleground.QueueAnnouncer.Enable", false));
     SetBoolConfig(WorldBoolConfigs::CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_PLAYERONLY, sConfigMgr->GetBoolDefault("Battleground.QueueAnnouncer.PlayerOnly", false));
     setIntConfig(WorldIntConfigs::CONFIG_BATTLEGROUND_INVITATION_TYPE, sConfigMgr->GetIntDefault("Battleground.InvitationType", 0));

@@ -12,6 +12,7 @@
 #include "EventProcessor.h"
 
 #include <deque>
+#include <map>
 
 //this container can't be deque, because deque doesn't like removing the last element - if you remove it, it invalidates next iterator and crash appears
 typedef std::list<Battleground*> BGFreeSlotQueueContainer;
@@ -28,7 +29,8 @@ struct PlayerQueueInfo                                      // stores informatio
 struct GroupQueueInfo                                       // stores information about the group in queue (also used when joined as solo!)
 {
     std::map<uint64, PlayerQueueInfo*> Players;             // player queue info map
-    uint32  Team;                                           // Player team (ALLIANCE/HORDE)
+    uint32  Team;                                           // Scoreboard team once invited (ALLIANCE/HORDE). Equals OriginalTeam until then.
+    uint32  OriginalTeam;                                   // Faction the group queued as. Not rewritten when cross-faction assigns a side.
     BattlegroundTypeId BgTypeId;                            // battleground type id
     bool    IsRated;                                        // rated
     uint8   ArenaType;                                      // 2v2, 3v3, 5v5 or 0 when BG
@@ -65,6 +67,7 @@ public:
     bool CheckPremadeMatch(BattlegroundBracketId bracket_id, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam);
     bool CheckNormalMatch(Battleground* bg_template, BattlegroundBracketId bracket_id, uint32 minPlayers, uint32 maxPlayers);
     bool CheckSkirmishForSameFaction(BattlegroundBracketId bracket_id, uint32 minPlayersPerTeam);
+    bool CheckCrossFactionMatch(BattlegroundBracketId bracket_id, Battleground* bg, uint32 minPlayers, uint32 maxPlayers);
     GroupQueueInfo* AddGroup(Player* leader, Group* group, BattlegroundTypeId bgTypeId, PvPDifficultyEntry const* bracketEntry, uint8 ArenaType, bool isRated, bool isPremade, uint32 ArenaRating, uint32 MatchmakerRating);
     void RemovePlayer(uint64 guid, bool decreaseInvitedCount);
     bool IsPlayerInvited(uint64 pl_guid, const uint32 bgInstanceGuid, const uint32 removeTime);
@@ -77,6 +80,7 @@ public:
 
     //we need constant add to begin and constant remove / add from the end, therefore deque suits our problem well
     typedef std::deque<GroupQueueInfo*> GroupsQueueType;
+    typedef std::multimap<uint32, GroupQueueInfo*> QueuedGroupMap;
 
     /*
     This two dimensional array is used to store All queued groups
@@ -110,6 +114,10 @@ public:
 
 private:
     bool InviteGroupToBG(GroupQueueInfo* ginfo, Battleground* bg, uint32 side);
+    // With cross-faction disabled, or for arenas, this is the group's queued team. Otherwise it is the scoreboard side of the selection pool.
+    uint32 SelectionSide(Battleground const* bg, TeamId pool, uint32 queuedTeam) const;
+    bool FillXPlayersToBG(BattlegroundBracketId bracket_id, Battleground* bg, bool start, uint32 minPlayers, uint32 maxPlayers);
+    int32 PreAddPlayers(QueuedGroupMap const& groups, int32 maxAdd, uint32 maxInTeam);
     uint32 m_WaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS][COUNT_OF_PLAYERS_TO_AVERAGE_WAIT_TIME];
     uint32 m_WaitTimeLastPlayer[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
     uint32 m_SumOfWaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];

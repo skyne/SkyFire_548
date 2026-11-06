@@ -6,6 +6,7 @@
 #include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
 #include "Battleground.h"
+#include "Cfbg.h"
 #include "BattlegroundMgr.h"
 #include "BattlePetMgr.h"
 #include "Chat.h"
@@ -1077,6 +1078,7 @@ void Battleground::RemovePlayerAtLeave(uint64 guid, bool Transport, bool SendPac
     {
         // Do next only if found in battleground
         player->SetBattlegroundId(0, BattlegroundTypeId::BATTLEGROUND_TYPE_NONE);  // We're not in BG.
+        Cfbg::FitPlayerInTeam(player, this, false);
         // reset destination bg team
         player->SetBGTeam(0);
         player->RemoveBattlegroundQueueJoinTime(bgTypeId);
@@ -1226,6 +1228,8 @@ void Battleground::AddPlayer(Player* player)
     player->ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GET_KILLING_BLOWS, ACHIEVEMENT_CRITERIA_CONDITION_BG_MAP, GetMapId(), true);
     player->ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_SPECIAL_PVP_KILL, ACHIEVEMENT_CRITERIA_CONDITION_BG_MAP, GetMapId(), true);
 
+    Cfbg::FitPlayerInTeam(player, this, true);
+
     // setup BG group membership
     PlayerAddedToBGCheckIfBGIsRunning(player);
     AddOrSetPlayerToCorrectBgGroup(player, team);
@@ -1276,6 +1280,7 @@ void Battleground::EventPlayerLoggedIn(Player* player)
         }
     }
     m_Players[guid].OfflineRemoveTime = 0;
+    Cfbg::FitPlayerInTeam(player, this, true);
     PlayerAddedToBGCheckIfBGIsRunning(player);
     // if battleground is starting, then add preparation aura
     // we don't have to do that, because preparation aura isn't removed when player logs out
