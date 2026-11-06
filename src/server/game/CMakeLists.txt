@@ -10,6 +10,7 @@ file(GLOB_RECURSE sources_AI AI/*.cpp AI/*.h)
 file(GLOB_RECURSE sources_AuctionHouse AuctionHouse/*.cpp AuctionHouse/*.h)
 file(GLOB_RECURSE sources_Battlefield Battlefield/*.cpp Battlefield/*.h)
 file(GLOB_RECURSE sources_Battlegrounds Battlegrounds/*.cpp Battlegrounds/*.h)
+file(GLOB_RECURSE sources_Cfbg Cfbg/*.cpp Cfbg/*.h)
 file(GLOB_RECURSE sources_BattlePet BattlePet/*.cpp BattlePet/*.h)
 file(GLOB_RECURSE sources_Boost Boost/*.cpp Boost/*.h)
 file(GLOB_RECURSE sources_BlackMarket BlackMarket/*.cpp BlackMarket/*.h)
@@ -64,6 +65,7 @@ source_group(AI FILES ${sources_AI})
 source_group(AuctionHouse FILES ${sources_AuctionHouse})
 source_group(Battlefield FILES ${sources_Battlefield})
 source_group(Battlegrounds FILES ${sources_Battlegrounds})
+source_group(Cfbg FILES ${sources_Cfbg})
 source_group(BattlePet FILES ${sources_BattlePet})
 source_group(Boost FILES ${sources_Boost})
 source_group(BlackMarket FILES ${sources_BlackMarket})
@@ -119,6 +121,7 @@ set(game_STAT_SRCS
   ${sources_AuctionHouse}
   ${sources_Battlefield}
   ${sources_Battlegrounds}
+  ${sources_Cfbg}
   ${sources_BattlePet}
   ${sources_Boost}
   ${sources_BlackMarket}
@@ -197,6 +200,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlefield/Zones
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds
   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds/Zones
+  ${CMAKE_CURRENT_SOURCE_DIR}/Cfbg
   ${CMAKE_CURRENT_SOURCE_DIR}/BattlePet
   ${CMAKE_CURRENT_SOURCE_DIR}/Boost
   ${CMAKE_CURRENT_SOURCE_DIR}/BlackMarket
