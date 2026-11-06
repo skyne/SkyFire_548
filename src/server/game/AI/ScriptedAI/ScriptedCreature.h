@@ -366,6 +366,8 @@ struct ScriptedAI : public CreatureAI
         return heroic25;
     }
 
+    EventMap events;
+
 private:
     DifficultyID _difficulty;
     uint32 _evadeCheckCooldown;
