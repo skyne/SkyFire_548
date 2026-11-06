@@ -4,6 +4,7 @@
 */
 
 #include "Battleground.h"
+#include "Cluster/ClusterBus.h"
 #include "BattlegroundMgr.h"
 #include "Common.h"
 #include "Formulas.h"
@@ -2164,6 +2165,23 @@ void Group::BroadcastPacket(WorldPacket* packet, bool ignorePlayersInBGRaid, int
         if (player->GetSession() && (group == -1 || itr->getSubGroup() == group))
             player->GetSession()->SendPacket(packet);
     }
+
+    std::vector<uint32> targets;
+    for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+    {
+        if (ignore != 0 && citr->guid == ignore)
+            continue;
+        if (group != -1 && citr->group != group)
+            continue;
+        if (ignorePlayersInBGRaid)
+        {
+            Player* member = ObjectAccessor::FindPlayer(citr->guid);
+            if (member && member->GetGroup() != this)
+                continue;
+        }
+        targets.push_back(GUID_LOPART(citr->guid));
+    }
+    sClusterBus->RelayToPlayers(targets, packet);
 }
 
 void Group::BroadcastReadyCheck(WorldPacket* packet)

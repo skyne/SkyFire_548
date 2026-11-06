@@ -136,6 +136,7 @@ class Channel
 public:
     Channel(std::string const& name, uint32 channel_id, uint32 Team = 0);
     std::string const& GetName() const { return _name; }
+    uint32 GetTeam() const { return _Team; }
     uint32 GetChannelId() const { return _channelId; }
     bool IsConstant() const { return _channelId != 0; }
     bool IsAnnounce() const { return _announce; }
@@ -165,6 +166,7 @@ public:
     void List(Player const* player);
     void Announce(Player const* player);
     void Say(uint64 guid, std::string const& what, Language lang);
+    void DeliverClusterPacket(WorldPacket* data, uint64 speakerGuid) { SendToAll(data, speakerGuid); }
     void Invite(Player const* player, std::string const& newp);
     void Voice(uint64 guid1, uint64 guid2);
     void DeVoice(uint64 guid1, uint64 guid2);

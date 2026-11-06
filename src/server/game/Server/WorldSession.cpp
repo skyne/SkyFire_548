@@ -27,6 +27,7 @@
 #include "Player.h"
 #include "RuntimeMetrics.h"
 #include "ScriptMgr.h"
+#include "Cluster/ClusterBus.h"
 #include "SocialMgr.h"
 #include "Transport.h"
 #include "Vehicle.h"
@@ -126,6 +127,12 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     m_botActivity(BotActivity::Full),
     m_botSlowAccumulator(0),
     m_botSlowInterval(5000),
+    m_botMigrationPending(false),
+    m_botMigrationMap(0),
+    m_botMigrationX(0.f),
+    m_botMigrationY(0.f),
+    m_botMigrationZ(0.f),
+    m_botMigrationO(0.f),
     m_sessionDbcLocale(sWorld->GetAvailableDbcLocale(locale)),
     m_sessionDbLocaleIndex(locale),
     m_latency(0),
@@ -759,6 +766,7 @@ void WorldSession::LogoutPlayer(bool save)
         }
 
         //! Broadcast a logout message to the player's friends
+        sClusterBus->PublishPresenceRemove(_player->GetGUIDLow());
         sSocialMgr->SendFriendStatus(_player, FRIEND_OFFLINE, _player->GetGUIDLow(), true);
         sSocialMgr->RemovePlayerSocial(_player->GetGUIDLow());
 

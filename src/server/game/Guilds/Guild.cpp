@@ -6,6 +6,7 @@
 #include "AccountMgr.h"
 #include "CalendarMgr.h"
 #include "Chat.h"
+#include "Cluster/ClusterBus.h"
 #include "Config.h"
 #include "DatabaseEnv.h"
 #include "Guild.h"
@@ -101,11 +102,11 @@ void Guild::SendCommandResult(WorldSession* session, GuildCommandType type, Guil
 
 void Guild::SendSaveEmblemResult(WorldSession* session, GuildEmblemError errCode)
 {
-    WorldPacket data(MSG_SAVE_GUILD_EMBLEM, 4);
+    WorldPacket data(SMSG_SAVE_GUILD_EMBLEM, 4);
     data << uint32(errCode);
     session->SendPacket(&data);
 
-    SF_LOG_DEBUG("guild", "MSG_SAVE_GUILD_EMBLEM [%s] Code: %u", session->GetPlayerInfo().c_str(), errCode);
+    SF_LOG_DEBUG("guild", "SMSG_SAVE_GUILD_EMBLEM [%s] Code: %u", session->GetPlayerInfo().c_str(), errCode);
 }
 
 // LogHolder
@@ -775,7 +776,7 @@ int32 Guild::Member::GetBankWithdrawValue(uint8 tabId) const
 // EmblemInfo
 void EmblemInfo::ReadPacket(WorldPacket& recv)
 {
-    recv >> m_style >> m_color >> m_borderStyle >> m_borderColor >> m_backgroundColor;
+    recv >> m_borderStyle >> m_backgroundColor >> m_borderColor >> m_color >> m_style;
 }
 
 void EmblemInfo::LoadFromDB(Field* fields)
@@ -1505,12 +1506,12 @@ void Guild::HandleQuery(WorldSession* session)
         }
 
         data.WriteString(m_name);
-        data << uint32(m_emblemInfo.GetBorderColor());
+        data << uint32(m_emblemInfo.GetBackgroundColor());
 
         data.WriteByteSeq(guid[5]);
         data.WriteByteSeq(guid[4]);
 
-        data << uint32(m_emblemInfo.GetBackgroundColor());
+        data << uint32(m_emblemInfo.GetBorderColor());
 
         data.WriteByteSeq(guid[1]);
         data.WriteByteSeq(guid[6]);
@@ -2737,6 +2738,8 @@ void Guild::BroadcastToGuild(WorldSession* session, bool officerOnly, std::strin
                 if (player->GetSession() && _HasRankRight(player, officerOnly ? GR_RIGHT_OFFCHATLISTEN : GR_RIGHT_GCHATLISTEN) &&
                     !player->GetSocial()->HasIgnore(session->GetPlayer()->GetGUIDLow()))
                     player->GetSession()->SendPacket(&data);
+        if (sClusterBus->IsEnabled() && !sClusterBus->IsApplying())
+            sClusterBus->RelayGuildChat(GetId(), session->GetPlayer()->GetGUIDLow(), officerOnly, false, "", &data);
     }
 }
 
@@ -2752,22 +2755,52 @@ void Guild::BroadcastAddonToGuild(WorldSession* session, bool officerOnly, std::
                     !player->GetSocial()->HasIgnore(session->GetPlayer()->GetGUIDLow()) &&
                     player->GetSession()->IsAddonRegistered(prefix))
                     player->GetSession()->SendPacket(&data);
+        if (sClusterBus->IsEnabled() && !sClusterBus->IsApplying())
+            sClusterBus->RelayGuildChat(GetId(), session->GetPlayer()->GetGUIDLow(), officerOnly, true, prefix, &data);
+    }
+}
+
+void Guild::DeliverClusterChat(WorldPacket* packet, uint32 senderLow, bool officerOnly, bool addon, std::string const& prefix) const
+{
+    for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+    {
+        Player* player = itr->second->FindPlayer();
+        if (!player || !player->GetSession())
+            continue;
+        if (!_HasRankRight(player, officerOnly ? GR_RIGHT_OFFCHATLISTEN : GR_RIGHT_GCHATLISTEN))
+            continue;
+        if (senderLow && player->GetSocial()->HasIgnore(senderLow))
+            continue;
+        if (addon && !player->GetSession()->IsAddonRegistered(prefix))
+            continue;
+        player->GetSession()->SendPacket(packet);
     }
 }
 
 void Guild::BroadcastPacketToRank(WorldPacket* packet, uint8 rankId) const
 {
+    std::vector<uint32> targets;
     for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
-        if (itr->second->IsRank(rankId))
-            if (Player* player = itr->second->FindPlayer())
-                player->GetSession()->SendPacket(packet);
+    {
+        if (!itr->second->IsRank(rankId))
+            continue;
+        if (Player* player = itr->second->FindPlayer())
+            player->GetSession()->SendPacket(packet);
+        targets.push_back(GUID_LOPART(itr->second->GetGUID()));
+    }
+    sClusterBus->RelayToPlayers(targets, packet);
 }
 
 void Guild::BroadcastPacket(WorldPacket* packet) const
 {
+    std::vector<uint32> targets;
     for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+    {
         if (Player* player = itr->second->FindPlayer())
             player->GetSession()->SendPacket(packet);
+        targets.push_back(GUID_LOPART(itr->second->GetGUID()));
+    }
+    sClusterBus->RelayToPlayers(targets, packet);
 }
 
 void Guild::MassInviteToEvent(WorldSession* session, uint32 minLevel, uint32 maxLevel, uint32 minRank)

@@ -21,6 +21,7 @@
 #include "CellImpl.h"
 #include "Channel.h"
 #include "CharacterDatabaseCleaner.h"
+#include "Cluster/ClusterBus.h"
 #include "ClusterMgr.h"
 #include "Chat.h"
 #include "CinematicPathMgr.h"
@@ -895,6 +896,7 @@ void World::LoadConfigSettings(bool reload)
 
     SetBoolConfig(WorldBoolConfigs::CONFIG_INSTANCE_IGNORE_LEVEL, sConfigMgr->GetBoolDefault("Instance.IgnoreLevel", false));
     SetBoolConfig(WorldBoolConfigs::CONFIG_INSTANCE_IGNORE_RAID, sConfigMgr->GetBoolDefault("Instance.IgnoreRaid", false));
+    SetBoolConfig(WorldBoolConfigs::CONFIG_RAID_FLEX_SCALE, sConfigMgr->GetBoolDefault("RaidScale.Enable", true));
 
     SetBoolConfig(WorldBoolConfigs::CONFIG_CAST_UNSTUCK, sConfigMgr->GetBoolDefault("CastUnstuck", true));
     setIntConfig(WorldIntConfigs::CONFIG_INSTANCE_RESET_TIME_HOUR, sConfigMgr->GetIntDefault("Instance.ResetTimeHour", 4));
@@ -2149,6 +2151,7 @@ void World::Update(uint32 diff)
     ///- Update the game time and check for shutdown time
     _UpdateGameTime();
     sClusterMgr->Update(diff);
+    sClusterBus->Update();
 
     /// Handle daily quests reset time
     if (m_gameTime > m_NextDailyQuestReset)
@@ -2361,6 +2364,8 @@ void World::SendGlobalMessage(WorldPacket* packet, WorldSession* self, uint32 te
             itr->second->SendPacket(packet);
         }
     }
+
+    sClusterBus->RelayGlobal(packet, team, false);
 }
 
 /// Send a packet to all GMs (except self if mentioned)
@@ -2382,6 +2387,8 @@ void World::SendGlobalGMMessage(WorldPacket* packet, WorldSession* self, uint32 
         if (!team || player->GetTeam() == team)
             session->SendPacket(packet);
     }
+
+    sClusterBus->RelayGlobal(packet, team, true);
 }
 
 namespace Skyfire
@@ -2446,6 +2453,18 @@ void World::SendWorldText(int32 string_id, ...)
     }
 
     va_end(ap);
+
+    if (sClusterBus->IsEnabled())
+    {
+        va_start(ap, string_id);
+        char const* text = sObjectMgr->GetSkyFireString(string_id, DEFAULT_LOCALE);
+        char formatted[2048];
+        formatted[0] = '\0';
+        if (text)
+            vsnprintf(formatted, sizeof(formatted), text, ap);
+        va_end(ap);
+        sClusterBus->RelaySystemText(formatted, false);
+    }
 }
 
 /// Send a System Message to all GMs (except self if mentioned)
@@ -2472,6 +2491,18 @@ void World::SendGMText(int32 string_id, ...)
     }
 
     va_end(ap);
+
+    if (sClusterBus->IsEnabled())
+    {
+        va_start(ap, string_id);
+        char const* text = sObjectMgr->GetSkyFireString(string_id, DEFAULT_LOCALE);
+        char formatted[2048];
+        formatted[0] = '\0';
+        if (text)
+            vsnprintf(formatted, sizeof(formatted), text, ap);
+        va_end(ap);
+        sClusterBus->RelaySystemText(formatted, true);
+    }
 }
 
 /// DEPRECATED, only for debug purpose. Send a System Message to all players (except self if mentioned)

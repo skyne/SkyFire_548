@@ -4,6 +4,7 @@
 */
 
 #include "AuctionHouseMgr.h"
+#include "Cluster/ClusterBus.h"
 #include "BattlegroundMgr.h"
 #include "BlackMarketMgr.h"
 #include "CalendarMgr.h"
@@ -267,4 +268,7 @@ void MailDraft::SendMailTo(SQLTransaction& trans, MailReceiver const& receiver, 
         SQLTransaction temp = SQLTransaction(NULL);
         deleteIncludedItems(temp);
     }
+
+    if (!pReceiver)
+        sClusterBus->NotifyMail(receiver.GetPlayerGUIDLow(), mailId);
 }

@@ -14,6 +14,7 @@
 #include "CellImpl.h"
 #include "CharacterBoost.h"
 #include "Chat.h"
+#include "Cluster/ClusterBus.h"
 #include "Common.h"
 #include "CreatureAI.h"
 #include "DatabaseEnv.h"
@@ -1018,6 +1019,142 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recvData)
 
         ++displaycount;
     }
+
+    sClusterBus->VisitRemotes([&](ClusterRemotePlayer const& remote)
+    {
+        if (remote.Team != team && !HasPermission(rbac::RBAC_PERM_TWO_SIDE_WHO_LIST))
+            return;
+        if (!HasPermission(rbac::RBAC_PERM_WHO_SEE_ALL_SEC_LEVELS) && remote.Security > uint8(gmLevelInWhoList))
+            return;
+        if (remote.Level < levelMin || remote.Level > levelMax)
+            return;
+        if (!(classMask & (1 << remote.ClassId)))
+            return;
+        if (!(raceMask & (1 << remote.Race)))
+            return;
+
+        bool z_show = true;
+        for (uint32 i = 0; i < zonesCount; ++i)
+        {
+            if (zoneIds[i] == remote.ZoneId)
+            {
+                z_show = true;
+                break;
+            }
+            z_show = false;
+        }
+        if (!z_show)
+            return;
+
+        std::wstring wpname;
+        if (!Utf8toWStr(remote.Name, wpname))
+            return;
+        wstrToLower(wpname);
+        if (!(wPlayerName.empty() || wpname.find(wPlayerName) != std::wstring::npos))
+            return;
+
+        std::wstring wgname;
+        if (!Utf8toWStr(remote.GuildName, wgname))
+            return;
+        wstrToLower(wgname);
+        if (!(wGuildName.empty() || wgname.find(wGuildName) != std::wstring::npos))
+            return;
+
+        std::string aname;
+        if (AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(remote.ZoneId))
+            aname = areaEntry->m_AreaName[GetSessionDbcLocale()];
+
+        bool s_show = true;
+        for (uint32 i = 0; i < wordCount; ++i)
+        {
+            if (!wWords[i].empty())
+            {
+                if (wgname.find(wWords[i]) != std::wstring::npos ||
+                    wpname.find(wWords[i]) != std::wstring::npos ||
+                    Utf8FitTo(aname, wWords[i]))
+                {
+                    s_show = true;
+                    break;
+                }
+                s_show = false;
+            }
+        }
+        if (!s_show)
+            return;
+        if ((matchcount++) >= sWorld->getIntConfig(WorldIntConfigs::CONFIG_MAX_WHO))
+            return;
+
+        ObjectGuid playerGuid = MAKE_NEW_GUID(remote.Guid, 0, HIGHGUID_PLAYER);
+        ObjectGuid accountId = remote.AccountId;
+        ObjectGuid guildGuid = remote.GuildId ? MAKE_NEW_GUID(remote.GuildId, 0, HIGHGUID_GUILD) : 0;
+
+        data.WriteBit(accountId[2]);
+        data.WriteBit(playerGuid[2]);
+        data.WriteBit(accountId[7]);
+        data.WriteBit(guildGuid[5]);
+        data.WriteBits(remote.GuildName.size(), 7);
+        data.WriteBit(accountId[1]);
+        data.WriteBit(accountId[5]);
+        data.WriteBit(guildGuid[7]);
+        data.WriteBit(playerGuid[5]);
+        data.WriteBit(false);
+        data.WriteBit(guildGuid[1]);
+        data.WriteBit(playerGuid[6]);
+        data.WriteBit(guildGuid[2]);
+        data.WriteBit(playerGuid[4]);
+        data.WriteBit(guildGuid[0]);
+        data.WriteBit(guildGuid[3]);
+        data.WriteBit(accountId[6]);
+        data.WriteBit(false);
+        data.WriteBit(playerGuid[1]);
+        data.WriteBit(guildGuid[4]);
+        data.WriteBit(accountId[0]);
+        for (uint8 i = 0; i < MAX_DECLINED_NAME_CASES; ++i)
+            data.WriteBits(0, 7);
+        data.WriteBit(playerGuid[3]);
+        data.WriteBit(guildGuid[6]);
+        data.WriteBit(playerGuid[0]);
+        data.WriteBit(accountId[4]);
+        data.WriteBit(accountId[3]);
+        data.WriteBit(playerGuid[7]);
+        data.WriteBits(remote.Name.size(), 6);
+
+        bytesData.WriteByteSeq(playerGuid[1]);
+        bytesData << uint32(remote.VirtualRealm);
+        bytesData.WriteByteSeq(playerGuid[7]);
+        bytesData << uint32(realmID);
+        bytesData.WriteByteSeq(playerGuid[4]);
+        bytesData.WriteString(remote.Name);
+        bytesData.WriteByteSeq(guildGuid[1]);
+        bytesData.WriteByteSeq(playerGuid[0]);
+        bytesData.WriteByteSeq(guildGuid[2]);
+        bytesData.WriteByteSeq(guildGuid[0]);
+        bytesData.WriteByteSeq(guildGuid[4]);
+        bytesData.WriteByteSeq(playerGuid[3]);
+        bytesData.WriteByteSeq(guildGuid[6]);
+        bytesData << uint32(remote.AccountId);
+        bytesData.WriteString(remote.GuildName);
+        bytesData.WriteByteSeq(guildGuid[3]);
+        bytesData.WriteByteSeq(accountId[4]);
+        bytesData << uint8(remote.ClassId);
+        bytesData.WriteByteSeq(accountId[7]);
+        bytesData.WriteByteSeq(playerGuid[6]);
+        bytesData.WriteByteSeq(playerGuid[2]);
+        bytesData.WriteByteSeq(accountId[2]);
+        bytesData.WriteByteSeq(accountId[3]);
+        bytesData << uint8(remote.Race);
+        bytesData.WriteByteSeq(guildGuid[7]);
+        bytesData.WriteByteSeq(accountId[1]);
+        bytesData.WriteByteSeq(accountId[5]);
+        bytesData.WriteByteSeq(accountId[6]);
+        bytesData.WriteByteSeq(playerGuid[5]);
+        bytesData.WriteByteSeq(accountId[0]);
+        bytesData << uint8(remote.Gender);
+        bytesData.WriteByteSeq(guildGuid[5]);
+        bytesData << uint8(remote.Level);
+        bytesData << int32(remote.ZoneId);
+        ++displaycount;
+    });
 
     data.FlushBits();
     data.PutBits(pos, displaycount, 6);

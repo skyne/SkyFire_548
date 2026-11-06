@@ -820,6 +820,7 @@ public:
 
     // Broadcasts
     void BroadcastToGuild(WorldSession* session, bool officerOnly, std::string const& msg, Language language = Language::LANG_UNIVERSAL) const;
+    void DeliverClusterChat(WorldPacket* packet, uint32 senderLow, bool officerOnly, bool addon, std::string const& prefix) const;
     void BroadcastAddonToGuild(WorldSession* session, bool officerOnly, std::string const& msg, std::string const& prefix) const;
     void BroadcastPacketToRank(WorldPacket* packet, uint8 rankId) const;
     void BroadcastPacket(WorldPacket* packet) const;

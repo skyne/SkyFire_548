@@ -19,6 +19,7 @@
 #include "CharacterDatabaseCleaner.h"
 #include "Chat.h"
 #include "ClusterLinkSession.h"
+#include "Cluster/ClusterBus.h"
 #include "ClusterMgr.h"
 #include "ClusterPlacement.h"
 #include "Common.h"
@@ -26,6 +27,7 @@
 #include "CreatureAI.h"
 #include "DatabaseEnv.h"
 #include "Player.h"
+#include "RaidScale.h"
 //#include "DBCStructure.h"
 #include "DB2Stores.h"
 #include "DisableMgr.h"
@@ -2103,11 +2105,14 @@ void Player::ToggleAFK()
     // afk player not allowed in battleground
     if (isAFK() && InBattleground() && !InArena())
         LeaveBattleground();
+
+    sClusterBus->PublishPresence(this);
 }
 
 void Player::ToggleDND()
 {
     ToggleFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_DND);
+    sClusterBus->PublishPresence(this);
 }
 
 uint8 Player::GetChatTag() const
@@ -2230,6 +2235,7 @@ bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, floa
         payload.Flags |= Skyfire::Cluster::HANDOFF_FLAG_FORCE;
 
     std::shared_ptr<ClusterLinkSession> link = GetSession()->GetClusterLink();
+    sClusterBus->PublishPresenceRemove(GetGUIDLow());
     link->SendHandoff(payload);
     SF_LOG_INFO("maps", "Player %s handing off to map %u on another cluster node.", GetName().c_str(), mapid);
     if (IsInWorld())
@@ -2389,10 +2395,32 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             if (placed && place.nodeId != sClusterMgr->GetNodeId())
             {
                 NotePartyDesiredLayer(GetGUIDLow(), mapid, place.nodeId);
+                if (GetSession()->IsBot())
+                {
+                    GetSession()->SetPendingBotMigration(mapid, x, y, z, orientation);
+                    SF_LOG_INFO("maps", "Bot %s queued move to map %u on cluster node %u.",
+                        GetName().c_str(), mapid, place.nodeId);
+                    return false;
+                }
                 return RequestClusterHandoff(mapid, x, y, z, orientation, options, place.nodeId);
             }
             if (!placed && !sClusterMgr->OwnsMap(mapid))
+            {
+                if (GetSession()->IsBot())
+                {
+                    uint32 nodeId = 0;
+                    std::string host;
+                    uint16 port = 0;
+                    if (sClusterMgr->LookupMapOwner(mapid, nodeId, host, port) && nodeId != sClusterMgr->GetNodeId())
+                    {
+                        GetSession()->SetPendingBotMigration(mapid, x, y, z, orientation);
+                        SF_LOG_INFO("maps", "Bot %s queued move to map %u on cluster node %u.",
+                            GetName().c_str(), mapid, nodeId);
+                    }
+                    return false;
+                }
                 return RequestClusterHandoff(mapid, x, y, z, orientation, options);
+            }
         }
 
         // Check enter rights before map getting to avoid creating instance copy for player
@@ -8450,6 +8478,7 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
         SendInitWorldStates(newZone, newArea);              // only if really enters to new zone, not just area change, works strange...
         if (Guild* guild = GetGuild())
             guild->UpdateMemberData(this, GUILD_MEMBER_DATA_ZONEID, newZone);
+        sClusterBus->PublishPresence(this);
     }
 
     // group update
@@ -13897,6 +13926,76 @@ void Player::_LoadMail()
     m_mailsLoaded = true;
 }
 
+bool Player::PullNewMail(uint32 mailId)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MAIL);
+    stmt->setUInt32(0, GetGUIDLow());
+    PreparedQueryResult result = CharacterDatabase.Query(stmt);
+    if (!result)
+        return false;
+
+    bool found = false;
+    bool readyNow = false;
+    time_t deliverTime = 0;
+    Mail* created = NULL;
+    do
+    {
+        Field* fields = result->Fetch();
+        if (fields[0].GetUInt32() != mailId)
+            continue;
+
+        found = true;
+        deliverTime = time_t(fields[8].GetUInt32());
+        readyNow = deliverTime <= time(NULL);
+        if (!m_mailsLoaded || GetMail(mailId))
+            break;
+
+        Mail* mail = new Mail;
+        mail->messageID = fields[0].GetUInt32();
+        mail->messageType = fields[1].GetUInt8();
+        mail->sender = fields[2].GetUInt32();
+        mail->receiver = fields[3].GetUInt32();
+        mail->subject = fields[4].GetString();
+        mail->body = fields[5].GetString();
+        bool hasItems = fields[6].GetBool();
+        mail->expire_time = time_t(fields[7].GetUInt32());
+        mail->deliver_time = deliverTime;
+        mail->money = fields[9].GetUInt64();
+        mail->COD = fields[10].GetUInt64();
+        mail->checked = fields[11].GetUInt8();
+        mail->stationery = fields[12].GetUInt8();
+        mail->mailTemplateId = fields[13].GetInt16();
+        if (mail->mailTemplateId && !sMailTemplateStore.LookupEntry(mail->mailTemplateId))
+            mail->mailTemplateId = 0;
+        mail->state = MailState::MAIL_STATE_UNCHANGED;
+        if (hasItems)
+            _LoadMailedItems(mail);
+        m_mail.push_back(mail);
+        created = mail;
+        break;
+    } while (result->NextRow());
+
+    if (!found)
+        return false;
+
+    if (!m_mailsLoaded)
+    {
+        if (readyNow)
+            SendNewMail();
+        else if (!m_nextMailDelivereTime || m_nextMailDelivereTime > deliverTime)
+            m_nextMailDelivereTime = deliverTime;
+        return true;
+    }
+
+    if (created)
+    {
+        UpdateNextMailTimeAndUnreads();
+        if (readyNow)
+            SendNewMail();
+    }
+    return true;
+}
+
 void Player::LoadPet()
 {
     //fixme: the pet should still be loaded if the player is not in world
@@ -14735,7 +14834,7 @@ bool Player::_LoadHomeBind(PreparedQueryResult result)
 /***                   SAVE SYSTEM                     ***/
 /*********************************************************/
 
-void Player::SaveToDB(bool create /*=false*/)
+void Player::SaveToDB(bool create /*=false*/, bool synchronous /*=false*/)
 {
     // delay auto save at any saves (manual, in code, or autosave)
     m_nextSave = sWorld->getIntConfig(WorldIntConfigs::CONFIG_INTERVAL_SAVE);
@@ -15038,7 +15137,10 @@ void Player::SaveToDB(bool create /*=false*/)
     if (m_session->isLogingOut() || !sWorld->GetBoolConfig(WorldBoolConfigs::CONFIG_STATS_SAVE_ONLY_ON_LOGOUT))
         _SaveStats(trans);
 
-    CharacterDatabase.CommitTransaction(trans);
+    if (synchronous)
+        CharacterDatabase.DirectCommitTransaction(trans);
+    else
+        CharacterDatabase.CommitTransaction(trans);
 
     // save pet (hunter pet level and experience and all type pets health/mana).
     if (Pet* pet = GetPet())
@@ -22501,9 +22603,12 @@ void Player::ResetMap()
     // when the first element of the list is being removed
     // nocheck_prev will return the padding element of the RefManager
     // instead of NULL in the case of prev
+    Map* map = GetMap();
     GetMap()->UpdateIteratorBack(this);
     Unit::ResetMap();
     GetMapRef().unlink();
+    if (map)
+        RaidScale::OnPlayersChanged(map);
 }
 
 void Player::SetMap(Map* map)

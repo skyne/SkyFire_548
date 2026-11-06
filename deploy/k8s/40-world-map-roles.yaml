@@ -23,6 +23,8 @@ spec:
           env:
             - name: SF_CLUSTER_ENABLED
               value: "1"
+            - name: SF_CLUSTER_NATS_URL
+              value: "nats://nats:4222"
             - name: SF_CLUSTER_NODE_ID
               value: "1"
             - name: SF_CLUSTER_AVAILABLE_MAPS
@@ -80,6 +82,8 @@ spec:
           env:
             - name: SF_CLUSTER_ENABLED
               value: "1"
+            - name: SF_CLUSTER_NATS_URL
+              value: "nats://nats:4222"
             - name: SF_CLUSTER_NODE_ID
               value: "2"
             - name: SF_CLUSTER_AVAILABLE_MAPS
@@ -137,6 +141,8 @@ spec:
           env:
             - name: SF_CLUSTER_ENABLED
               value: "1"
+            - name: SF_CLUSTER_NATS_URL
+              value: "nats://nats:4222"
             - name: SF_CLUSTER_NODE_ID
               value: "3"
             - name: SF_CLUSTER_AVAILABLE_MAPS
@@ -194,6 +200,8 @@ spec:
           env:
             - name: SF_CLUSTER_ENABLED
               value: "1"
+            - name: SF_CLUSTER_NATS_URL
+              value: "nats://nats:4222"
             - name: SF_CLUSTER_NODE_ID
               value: "4"
             - name: SF_CLUSTER_AVAILABLE_MAPS
@@ -251,6 +259,8 @@ spec:
           env:
             - name: SF_CLUSTER_ENABLED
               value: "1"
+            - name: SF_CLUSTER_NATS_URL
+              value: "nats://nats:4222"
             - name: SF_CLUSTER_NODE_ID
               value: "5"
             - name: SF_CLUSTER_AVAILABLE_MAPS

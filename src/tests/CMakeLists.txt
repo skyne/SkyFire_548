@@ -135,6 +135,25 @@ target_include_directories(cluster_link_protocol_tests PRIVATE
 
 add_test(NAME cluster_link_protocol_tests COMMAND cluster_link_protocol_tests)
 
+add_executable(cluster_bus_protocol_tests
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Cluster/ClusterBusProtocol.cpp
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets/ByteBuffer.cpp
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Debugging/Errors.cpp
+  ClusterBusProtocolTests.cpp
+)
+
+target_include_directories(cluster_bus_protocol_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Cluster
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Debugging
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Utilities
+)
+
+add_test(NAME cluster_bus_protocol_tests COMMAND cluster_bus_protocol_tests)
+
 add_executable(totp_tests
   ${CMAKE_SOURCE_DIR}/src/server/shared/Auth/TOTP.cpp
   ${CMAKE_SOURCE_DIR}/src/server/shared/Cryptography/CryptoRandom.cpp

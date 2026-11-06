@@ -6,6 +6,7 @@
 #include "SocialMgr.h"
 
 #include "AccountMgr.h"
+#include "Cluster/ClusterBus.h"
 #include "DatabaseEnv.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
@@ -192,9 +193,34 @@ void SocialMgr::GetFriendInfo(Player* player, uint32 friendGUID, FriendInfo& fri
     friendInfo.Level = 0;
     friendInfo.Class = 0;
 
-    Player* target = ObjectAccessor::FindPlayer(friendGUID);
+    Player* target = ObjectAccessor::FindPlayer(MAKE_NEW_GUID(friendGUID, 0, HIGHGUID_PLAYER));
     if (!target)
+    {
+        ClusterRemotePlayer const* remote = sClusterBus->FindRemote(friendGUID);
+        if (!remote)
+            return;
+
+        PlayerSocialMap::iterator itr = player->GetSocial()->m_playerSocialMap.find(friendGUID);
+        if (itr != player->GetSocial()->m_playerSocialMap.end())
+            friendInfo.Note = itr->second.Note;
+
+        if (!player->GetSession()->HasPermission(rbac::RBAC_PERM_WHO_SEE_ALL_SEC_LEVELS) &&
+            remote->Security > uint8(sWorld->getIntConfig(WorldIntConfigs::CONFIG_GM_LEVEL_IN_WHO_LIST)))
+            return;
+        if (remote->Team != player->GetTeam() && !player->GetSession()->HasPermission(rbac::RBAC_PERM_TWO_SIDE_WHO_LIST))
+            return;
+
+        if (remote->Flags & Skyfire::Cluster::PRESENCE_DND)
+            friendInfo.Status = FRIEND_STATUS_DND;
+        else if (remote->Flags & Skyfire::Cluster::PRESENCE_AFK)
+            friendInfo.Status = FRIEND_STATUS_AFK;
+        else
+            friendInfo.Status = FRIEND_STATUS_ONLINE;
+        friendInfo.Area = remote->ZoneId;
+        friendInfo.Level = remote->Level;
+        friendInfo.Class = remote->ClassId;
         return;
+    }
 
     PlayerSocialMap::iterator itr = player->GetSocial()->m_playerSocialMap.find(friendGUID);
     if (itr != player->GetSocial()->m_playerSocialMap.end())

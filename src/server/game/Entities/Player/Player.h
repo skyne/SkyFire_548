@@ -1941,7 +1941,9 @@ public:
     /***                   SAVE SYSTEM                     ***/
     /*********************************************************/
 
-    void SaveToDB(bool create = false);
+    // synchronous commits on this thread so a bot moving to another cluster
+    // node has its destination row visible before it is marked offline.
+    void SaveToDB(bool create = false, bool synchronous = false);
     void SaveInventoryAndGoldToDB(SQLTransaction& trans);                    // fast save function for item/money cheating preventing
     void SaveGoldToDB(SQLTransaction& trans);
 
@@ -2018,6 +2020,7 @@ public:
 
     void SendMailResult(uint32 mailId, MailResponseType mailAction, MailResponseResult mailError, uint32 equipError = 0, uint32 item_guid = 0, uint32 item_count = 0);
     void SendNewMail();
+    bool PullNewMail(uint32 mailId);
     void UpdateNextMailTimeAndUnreads();
     void AddNewMailDeliverTime(time_t deliver_time);
     bool IsMailsLoaded() const

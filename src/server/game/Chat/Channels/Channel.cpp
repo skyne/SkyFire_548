@@ -5,6 +5,7 @@
 
 #include "AccountMgr.h"
 #include "Channel.h"
+#include "Cluster/ClusterBus.h"
 #include "Chat.h"
 #include "DatabaseEnv.h"
 #include "ObjectMgr.h"
@@ -714,6 +715,7 @@ void Channel::SetOwner(uint64 guid, bool exclaim)
 
 void Channel::SendToAll(WorldPacket* data, uint64 guid)
 {
+    sClusterBus->RelayChannel(_Team, _name, guid, data);
     for (PlayerContainer::const_iterator i = playersStore.begin(); i != playersStore.end(); ++i)
         if (Player* player = ObjectAccessor::FindPlayer(i->first))
             if (!guid || !player->GetSocial()->HasIgnore(GUID_LOPART(guid)))
@@ -722,6 +724,7 @@ void Channel::SendToAll(WorldPacket* data, uint64 guid)
 
 void Channel::SendToAllButOne(WorldPacket* data, uint64 who)
 {
+    sClusterBus->RelayChannel(_Team, _name, 0, data);
     for (PlayerContainer::const_iterator i = playersStore.begin(); i != playersStore.end(); ++i)
         if (i->first != who)
             if (Player* player = ObjectAccessor::FindPlayer(i->first))

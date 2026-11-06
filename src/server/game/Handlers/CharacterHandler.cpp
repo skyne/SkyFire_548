@@ -11,6 +11,7 @@
 #include "CharacterBoost.h"
 #include "Chat.h"
 #include "ClusterLinkSession.h"
+#include "Cluster/ClusterBus.h"
 #include "ClusterMgr.h"
 #include "ClusterPlacement.h"
 #include "Common.h"
@@ -1963,6 +1964,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         pCurrChar->CastSpell(pCurrChar, 103985, true); //Stance of White Tiger
 
     sScriptMgr->OnPlayerLogin(pCurrChar, firstLogin);
+    sClusterBus->PublishPresence(pCurrChar);
     delete holder;
 }
 

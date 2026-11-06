@@ -7,6 +7,7 @@
 #include "CellImpl.h"
 #include "ChannelMgr.h"
 #include "Chat.h"
+#include "Cluster/ClusterBus.h"
 #include "Common.h"
 #include "DatabaseEnv.h"
 #include "GridNotifiersImpl.h"
@@ -23,6 +24,7 @@
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "Util.h"
+#include <vector>
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -321,16 +323,60 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
             }
 
             Player* receiver = sObjectAccessor->FindPlayerByName(to);
+            ClusterRemotePlayer const* remote = receiver ? NULL : sClusterBus->FindRemoteByName(to);
             bool const senderBypassesWhisperFilter = sWorld->GetBoolConfig(WorldBoolConfigs::CONFIG_CHAT_GM_WHISPER_FILTER_BYPASS) &&
                 GetSecurity() > AccountTypes::SEC_PLAYER;
+            uint64 remoteGuid = remote ? MAKE_NEW_GUID(remote->Guid, 0, HIGHGUID_PLAYER) : 0;
             bool const receiverFiltersWhispers = receiver && receiver->GetSession() && !receiver->isAcceptWhispers() &&
                 !senderBypassesWhisperFilter &&
                 receiver->GetSession()->HasPermission(rbac::RBAC_PERM_CAN_FILTER_WHISPERS) &&
                 !receiver->IsInWhisperWhiteList(sender->GetGUID());
-            if (!receiver || !receiver->GetSession() || (receiverFiltersWhispers && !sender->IsInRaidWith(receiver)))
+            bool const remoteFiltersWhispers = remote && (remote->Flags & Skyfire::Cluster::PRESENCE_ACCEPT_WHISPERS) == 0 &&
+                !senderBypassesWhisperFilter && remote->Security > uint8(AccountTypes::SEC_PLAYER) &&
+                !sender->IsInWhisperWhiteList(remoteGuid);
+            if ((!receiver && !remote) || (receiver && !receiver->GetSession()) || (receiverFiltersWhispers && !sender->IsInRaidWith(receiver)) || remoteFiltersWhispers)
             {
                 SendPlayerNotFoundNotice(to);
                 return;
+            }
+            if (remote)
+            {
+                if (!sender->IsGameMaster() && sender->getLevel() < sWorld->getIntConfig(WorldIntConfigs::CONFIG_CHAT_WHISPER_LEVEL_REQ) && !sender->IsInWhisperWhiteList(remoteGuid))
+                {
+                    SendNotification(GetSkyFireString(LANG_WHISPER_REQ), sWorld->getIntConfig(WorldIntConfigs::CONFIG_CHAT_WHISPER_LEVEL_REQ));
+                    return;
+                }
+                if (sender->GetTeam() != remote->Team && !HasPermission(rbac::RBAC_PERM_TWO_SIDE_INTERACTION_CHAT) && !sender->IsInWhisperWhiteList(remoteGuid))
+                {
+                    SendWrongFactionNotice();
+                    return;
+                }
+                if (sender->HasAura(1852) && (remote->Flags & Skyfire::Cluster::PRESENCE_GM) == 0)
+                {
+                    SendNotification(GetSkyFireString(LANG_GM_SILENCE), sender->GetName().c_str());
+                    return;
+                }
+
+                WorldPacket data;
+                ChatHandler::BuildChatPacket(data, ChatMsg::CHAT_MSG_WHISPER, lang, sender->GetGUID(), remoteGuid, msg, sender->GetChatTag(), sender->GetName(), remote->Name);
+                sClusterBus->RelayToPlayers(std::vector<uint32>(1, remote->Guid), &data);
+                if (lang != Language::LANG_ADDON)
+                {
+                    uint8 tag = CHAT_TAG_NONE;
+                    if (remote->Flags & Skyfire::Cluster::PRESENCE_GM)
+                        tag |= CHAT_TAG_GM;
+                    if (remote->Flags & Skyfire::Cluster::PRESENCE_DND)
+                        tag |= CHAT_TAG_DND;
+                    if (remote->Flags & Skyfire::Cluster::PRESENCE_AFK)
+                        tag |= CHAT_TAG_AFK;
+                    ChatHandler::BuildChatPacket(data, ChatMsg::CHAT_MSG_WHISPER_INFORM, Language::LANG_UNIVERSAL, remoteGuid, remoteGuid, msg, tag, remote->Name, remote->Name);
+                    SendPacket(&data);
+                    if ((remote->Flags & Skyfire::Cluster::PRESENCE_AFK) != 0)
+                        ChatHandler(this).PSendSysMessage(LANG_PLAYER_AFK, remote->Name.c_str(), remote->AutoReply.c_str());
+                    else if ((remote->Flags & Skyfire::Cluster::PRESENCE_DND) != 0)
+                        ChatHandler(this).PSendSysMessage(LANG_PLAYER_DND, remote->Name.c_str(), remote->AutoReply.c_str());
+                }
+                break;
             }
             if (!sender->IsGameMaster() && sender->getLevel() < sWorld->getIntConfig(WorldIntConfigs::CONFIG_CHAT_WHISPER_LEVEL_REQ) && !receiver->IsInWhisperWhiteList(sender->GetGUID()))
             {

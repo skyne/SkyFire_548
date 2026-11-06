@@ -387,6 +387,15 @@ Cluster.StaleSeconds = 30
 Cluster.MigrationTimeout = 300
 
 #
+#    Cluster.NatsUrl
+#        Description: NATS server used for cross-node chat, mail notice, guild,
+#                     party, friends, and /who. Empty keeps those local to this world.
+#        Default:     ""
+#        Example:     "nats://nats:4222"
+
+Cluster.NatsUrl = ""
+
+#
 #    Cluster.LayerSoftCap
 #        Description: Preferred in-world player count for one continent layer (this node's copy of a map).
 #        Default:     80
@@ -1157,6 +1166,18 @@ Instance.IgnoreLevel = 0
 #                     1 - (Enabled)
 
 Instance.IgnoreRaid = 0
+
+#
+#    RaidScale.Enable
+#        Description: Scale raid creature health and damage by players / map cap.
+#                     Fewer than 5 players still face the 5-player encounter. A full
+#                     group keeps the original numbers. The fraction locks when a
+#                     boss enters combat and is counted again on the next pull.
+#                     Spells that already have a target cap use the same fraction.
+#        Default:     1 - (Enabled)
+#                     0 - (Disabled)
+
+RaidScale.Enable = 1
 
 #
 #    Instance.ResetTimeHour

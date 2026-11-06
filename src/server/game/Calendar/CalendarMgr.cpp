@@ -4,6 +4,7 @@
 */
 
 #include "CalendarMgr.h"
+#include "Cluster/ClusterBus.h"
 #include "DatabaseEnv.h"
 #include "GuildMgr.h"
 #include "Log.h"
@@ -815,15 +816,32 @@ void CalendarMgr::SendCalendarCommandResult(uint64 guid, CalendarError err, std:
 
 void CalendarMgr::SendPacketToAllEventRelatives(WorldPacket packet, CalendarEvent const& calendarEvent)
 {
+    bool const guildWide = calendarEvent.IsGuildEvent() || calendarEvent.IsGuildAnnouncement();
     // Send packet to all guild members
-    if (calendarEvent.IsGuildEvent() || calendarEvent.IsGuildAnnouncement())
+    if (guildWide)
         if (Guild* guild = sGuildMgr->GetGuildById(calendarEvent.GetGuildId()))
             guild->BroadcastPacket(&packet);
 
     // Send packet to all invitees if event is non-guild, in other case only to non-guild invitees (packet was broadcasted for them)
+    std::vector<uint32> remoteInvitees;
     CalendarInviteStore invites = _invites[calendarEvent.GetEventId()];
     for (CalendarInviteStore::iterator itr = invites.begin(); itr != invites.end(); ++itr)
-        if (Player* player = ObjectAccessor::FindPlayer((*itr)->GetInviteeGUID()))
-            if (!calendarEvent.IsGuildEvent() || (calendarEvent.IsGuildEvent() && player->GetGuildId() != calendarEvent.GetGuildId()))
-                player->SendDirectMessage(&packet);
+    {
+        uint64 inviteeGuid = (*itr)->GetInviteeGUID();
+        uint32 inviteeLow = GUID_LOPART(inviteeGuid);
+        Player* player = ObjectAccessor::FindPlayer(inviteeGuid);
+        if (player && (!calendarEvent.IsGuildEvent() || player->GetGuildId() != calendarEvent.GetGuildId()))
+            player->SendDirectMessage(&packet);
+
+        if (guildWide)
+        {
+            if (player && player->GetGuildId() == calendarEvent.GetGuildId())
+                continue;
+            ClusterRemotePlayer const* remote = sClusterBus->FindRemote(inviteeLow);
+            if (remote && remote->GuildId == calendarEvent.GetGuildId())
+                continue;
+        }
+        remoteInvitees.push_back(inviteeLow);
+    }
+    sClusterBus->RelayToPlayers(remoteInvitees, &packet);
 }

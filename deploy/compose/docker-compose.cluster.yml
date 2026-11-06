@@ -28,6 +28,7 @@ x-world-env: &world-env
   SF_CLUSTER_LINK_BIND_IP: "0.0.0.0"
   SF_CLUSTER_SHARED_TOKEN: "${DOCKER_CLUSTER_TOKEN:-skyfire-cluster}"
   SF_CLUSTER_HIDE_WORLD_PORT: "1"
+  SF_CLUSTER_NATS_URL: "nats://sf-nats:4222"
   SF_REALM_ID: "1"
   LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
 
@@ -148,6 +149,16 @@ services:
         condition: service_completed_successfully
       sf-realmlist-init:
         condition: service_completed_successfully
+
+  sf-nats:
+    container_name: sf-nats
+    image: nats:2.11-alpine
+    networks:
+      - sf-network
+    command: ["-p", "4222"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4222:4222"
 
   sf-world-oldworld:
     <<: *world-base

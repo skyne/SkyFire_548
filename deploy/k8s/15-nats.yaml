@@ -1,0 +1,36 @@
+# Cross-node bus for chat, mail notice, guild, party, friends, and /who.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: skyfire
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.11-alpine
+          args: ["-p", "4222"]
+          ports:
+            - containerPort: 4222
+              name: client
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: skyfire
+spec:
+  selector:
+    app: nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: client

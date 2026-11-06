@@ -26,6 +26,7 @@
 #include "WorldRunnable.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
+#include "Cluster/ClusterBus.h"
 #include "ClusterLinkServer.h"
 #include "ClusterMgr.h"
 
@@ -542,6 +543,11 @@ int Master::Run()
                 sClusterMgr->GetLinkBindIP().c_str(), sClusterMgr->GetLinkPort());
             World::StopNow(ERROR_EXIT_CODE);
         }
+        if (!sClusterBus->Start())
+        {
+            SF_LOG_ERROR("server.worldserver", "Failed to start the cluster bus.");
+            World::StopNow(ERROR_EXIT_CODE);
+        }
     }
 
     if (!sClusterMgr->IsEnabled() || !sClusterMgr->HideWorldPort())
@@ -574,6 +580,7 @@ int Master::Run()
 
     soapService.Join();
 
+    sClusterBus->Stop();
     sClusterLinkServer->Stop();
     sClusterMgr->Shutdown();
 
