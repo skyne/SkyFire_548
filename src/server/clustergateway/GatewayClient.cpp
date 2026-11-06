@@ -414,7 +414,18 @@ int GatewayClient::HandleAuthSession(ByteBuffer& body)
     body >> digest[1];
     body >> digest[10];
     body >> addonSize;
-    body.read_skip(addonSize);
+    if (addonSize > 0xFFFFF || body.rpos() + addonSize > body.size())
+    {
+        SF_LOG_ERROR("server.clustergateway", "Auth session addon block rejected from %s size %u remaining %zu.",
+            _address.c_str(), addonSize, body.size() - body.rpos());
+        return -1;
+    }
+    _addonInfo.clear();
+    if (addonSize)
+    {
+        _addonInfo.resize(addonSize);
+        body.read(_addonInfo.contents(), addonSize);
+    }
     body.ReadBit();
     uint32 accountNameLength = body.ReadBits(11);
     std::string account = body.ReadString(accountNameLength);
@@ -615,7 +626,7 @@ bool GatewayClient::ConnectWorld(std::string const& host, uint16 port, Skyfire::
     else
     {
         ok = _worldLink->Attach(_accountId, _accountName, _address, _expansion, _locale, _security, _recruiter,
-            _hasBoost, _usedEmailLogin, _virtualRealmId, _sessionKey);
+            _hasBoost, _usedEmailLogin, _virtualRealmId, _sessionKey, _addonInfo);
     }
 
     if (!ok)

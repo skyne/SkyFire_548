@@ -36,7 +36,8 @@ public:
     bool Hello(uint32 realmId, std::string const& token);
     bool Attach(uint32 accountId, std::string const& accountName, std::string const& clientIp,
         uint8 expansion, uint8 locale, uint8 security, uint32 recruiter, bool hasBoost,
-        bool usedEmailLogin, uint32 virtualRealmId, SessionKey const& sessionKey);
+        bool usedEmailLogin, uint32 virtualRealmId, SessionKey const& sessionKey,
+        ByteBuffer const& addonInfo);
     bool Resume(uint32 accountId, std::string const& accountName, std::string const& clientIp,
         uint8 expansion, uint8 locale, uint8 security, uint32 recruiter, bool hasBoost,
         bool usedEmailLogin, uint32 virtualRealmId, SessionKey const& sessionKey,

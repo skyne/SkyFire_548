@@ -120,13 +120,17 @@ bool ClusterLinkClient::Hello(uint32 realmId, std::string const& token)
 
 bool ClusterLinkClient::Attach(uint32 accountId, std::string const& accountName, std::string const& clientIp,
     uint8 expansion, uint8 locale, uint8 security, uint32 recruiter, bool hasBoost,
-    bool usedEmailLogin, uint32 virtualRealmId, SessionKey const& sessionKey)
+    bool usedEmailLogin, uint32 virtualRealmId, SessionKey const& sessionKey,
+    ByteBuffer const& addonInfo)
 {
     ByteBuffer attach;
     attach << accountId << accountName << clientIp;
     attach << expansion << locale << security << recruiter << uint8(hasBoost ? 1 : 0)
         << uint8(usedEmailLogin ? 1 : 0) << virtualRealmId;
     attach.append(sessionKey.data(), sessionKey.size());
+    attach << uint32(addonInfo.size());
+    if (addonInfo.size())
+        attach.append(addonInfo.contents(), addonInfo.size());
 
     ByteBuffer encoded;
     Skyfire::Cluster::EncodeFrame(encoded, Skyfire::Cluster::LinkMessage::Attach, attach);

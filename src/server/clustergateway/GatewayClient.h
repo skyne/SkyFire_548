@@ -73,6 +73,7 @@ private:
     bool _hasBoost;
     bool _usedEmailLogin;
     uint32 _virtualRealmId;
+    ByteBuffer _addonInfo;
     std::atomic<bool> _closed;
     bool _proxyProtocol;
     std::vector<uint8> _proxyBuffer;

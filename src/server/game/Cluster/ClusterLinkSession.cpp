@@ -220,6 +220,22 @@ void ClusterLinkSession::HandleAttach(ByteBuffer& payload)
     }
     payload.read(sessionKey.data(), sessionKey.size());
 
+    uint32 addonSize = 0;
+    WorldPacket addonsData;
+    if (payload.rpos() + sizeof(uint32) <= payload.size())
+        payload >> addonSize;
+    if (addonSize)
+    {
+        if (addonSize > 0xFFFFF || payload.rpos() + addonSize > payload.size())
+        {
+            SF_LOG_ERROR("server.worldserver", "Cluster attach for account %u has a bad addon block (%u bytes).", accountId, addonSize);
+            Close();
+            return;
+        }
+        addonsData.resize(addonSize);
+        payload.read(addonsData.contents(), addonSize);
+    }
+
     WorldSession* session = new WorldSession(accountId, NULL, AccountTypes(security), expansion, time_t(0),
         LocaleConstant(locale), recruiter, false, hasBoost != 0, usedEmailLogin != 0, false, accountName, sessionKey);
     session->SetRemoteAddress(clientIp);
@@ -227,6 +243,7 @@ void ClusterLinkSession::HandleAttach(ByteBuffer& payload)
     session->SetClusterLink(shared_from_this());
     session->LoadGlobalAccountData();
     session->LoadTutorialsData();
+    session->ReadAddonsInfo(addonsData);
     session->LoadPermissions();
 
     {
