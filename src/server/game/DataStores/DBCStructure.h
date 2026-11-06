@@ -1349,6 +1349,31 @@ struct CriteriaTreeEntry
     //char* name;                                           // 7
 };
 
+// Scenario.dbc
+struct ScenarioEntry
+{
+    uint32 ID;                                              // 0
+    //char* name;                                           // 1
+    uint32 Flags;                                           // 2
+};
+
+// ScenarioStep.dbc
+struct ScenarioStepEntry
+{
+    uint32 ID;                                              // 0
+    uint32 CriteriaTreeID;                                  // 1
+    uint32 ScenarioID;                                      // 2
+    uint32 Step;                                            // 3
+    //char* description;                                    // 4
+    //char* name;                                           // 5
+    uint32 Flags;                                           // 6
+
+    bool IsBonusObjective() const
+    {
+        return Flags & SCENARIO_STEP_FLAG_BONUS_OBJECTIVE;
+    }
+};
+
 struct CurrencyTypesEntry
 {
     uint32 ID;                                              // 0        not used

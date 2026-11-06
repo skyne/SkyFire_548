@@ -1172,6 +1172,7 @@ public:                                                 // opcodes handlers
     void HandleQuestNPCQuery(WorldPacket& recvData);
     void HandleQueryQuestsCompleted(WorldPacket& recvData);
     void HandleQuestPOIQuery(WorldPacket& recvData);
+    void HandleQueryScenarioPOI(WorldPacket& recvData);
     void HandleEjectPassenger(WorldPacket& data);
     void HandleRideVehicleInteract(WorldPacket& recvData);
     void HandleUpdateProjectilePosition(WorldPacket& recvPacket);

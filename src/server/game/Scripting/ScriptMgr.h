@@ -1122,4 +1122,18 @@ struct atrigger_script : public SpellAreaTriggerScript
     IAreaTrigger* GetInterface() const override { return new T(); }
 };
 
+template <class T>
+struct spell_script : public SpellScriptLoader
+{
+    spell_script(char const* name) : SpellScriptLoader(name) { }
+    SpellScript* GetSpellScript() const override { return new T(); }
+};
+
+template <class T>
+struct aura_script : public SpellScriptLoader
+{
+    aura_script(char const* name) : SpellScriptLoader(name) { }
+    AuraScript* GetAuraScript() const override { return new T(); }
+};
+
 #endif

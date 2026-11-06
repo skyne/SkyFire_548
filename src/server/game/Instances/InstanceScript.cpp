@@ -17,6 +17,8 @@
 #include "Player.h"
 #include "WorldSession.h"
 
+#include <ctime>
+
 void InstanceScript::SaveToDB()
 {
     std::string data = GetSaveData();
@@ -496,6 +498,74 @@ void InstanceScript::UpdateEncounterState(EncounterCreditType type, uint32 credi
                     }
         }
     }
+}
+
+void InstanceScript::RememberScenarioStep(int32 step, uint32 scenarioId, uint32 startTime)
+{
+    _scenarioStep = step;
+    if (scenarioId)
+        _scenarioId = scenarioId;
+    else if (!_scenarioId)
+        _scenarioId = sScenarioMgr->GetScenarioIdForMap(instance);
+
+    if (startTime)
+        _scenarioStartTime = startTime;
+    else if (!_scenarioStartTime)
+        _scenarioStartTime = uint32(time(NULL));
+}
+
+uint64 InstanceScript::GetScenarioGUID() const
+{
+    uint32 scenarioId = _scenarioId ? _scenarioId : sScenarioMgr->GetScenarioIdForMap(instance);
+    if (!scenarioId || !instance)
+        return 0;
+
+    return MAKE_NEW_GUID(scenarioId, instance->GetInstanceId(), HIGHGUID_SCENARIO);
+}
+
+void InstanceScript::SendScenarioState(ScenarioData const& data, Player* player)
+{
+    RememberScenarioStep(int32(data.StepId), data.ScenarioId, 0);
+    sScenarioMgr->SendScenarioState(instance, data, player);
+}
+
+void InstanceScript::SendScenarioProgressUpdate(CriteriaProgressData const& data, Player* player)
+{
+    bool replaced = false;
+    for (std::vector<CriteriaProgressData>::iterator itr = _scenarioCriteria.begin(); itr != _scenarioCriteria.end(); ++itr)
+    {
+        if (itr->Id == data.Id)
+        {
+            *itr = data;
+            replaced = true;
+            break;
+        }
+    }
+
+    if (!replaced)
+        _scenarioCriteria.push_back(data);
+
+    sScenarioMgr->SendScenarioProgressUpdate(instance, data, player);
+}
+
+void InstanceScript::DoFinishLFGDungeon(uint32 dungeonId)
+{
+    if (!instance)
+        return;
+
+    Map::PlayerList const& players = instance->GetPlayers();
+    if (players.isEmpty())
+        return;
+
+    Player* player = players.begin()->GetSource();
+    if (!player)
+        return;
+
+    Group* group = player->GetGroup();
+    if (!group)
+        return;
+
+    sLFGMgr->FinishDungeon(group->GetGUID(), dungeonId);
 }
 
 void InstanceScript::UpdatePhasing()

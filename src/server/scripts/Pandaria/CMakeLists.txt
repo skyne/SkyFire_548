@@ -12,6 +12,9 @@ set(scripts_STAT_SRCS
   Pandaria/StormstoutBrewery/stormstout_brewery.h
   Pandaria/TempleOfJadeSerpent/temple_of_jade_serpent.h
   Pandaria/TempleOfJadeSerpent/instance_temple_of_jade_serpent.cpp
+  Pandaria/Scenarios/BrewingStorm/brewing_storm.cpp
+  Pandaria/Scenarios/BrewingStorm/brewing_storm.h
+  Pandaria/Scenarios/BrewingStorm/instance_brewing_storm.cpp
   Pandaria/zone_valley_of_the_four_winds.cpp
   Pandaria/zone_wandering_island.cpp
   Pandaria/MoguShanVault/boss_elegon.cpp
