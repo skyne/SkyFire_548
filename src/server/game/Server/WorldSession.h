@@ -1052,6 +1052,7 @@ public:                                                 // opcodes handlers
     void HandleGetChallengeModeRewards(WorldPacket& recvData);
     void HandleChallengeModeRequestLeaders(WorldPacket& recvData);
     void HandleChallengeModeRequestMapStats(WorldPacket& recvData);
+    void SendChallengeModeMapStatsUpdate(uint32 mapId);
 
     void SendLfgUpdateStatus(lfg::LfgUpdateData const& updateData, bool party, uint64 queueGuidOverride = 0, uint8 queueIdOverride = 0, uint32 joinTimeOverride = 0);
     void SendLfgRoleChosen(uint64 guid, uint8 roles);

@@ -29,8 +29,11 @@
 #include "Platform/Singleton.h"
 #include <functional>
 #include <limits>
+#include <cstring>
 #include <map>
+#include <mutex>
 #include <string>
+#include <vector>
 
 class Item;
 class PhaseMgr;
@@ -604,6 +607,58 @@ struct SceneTemplate
 
 typedef UNORDERED_MAP<uint32, SceneTemplate> SceneTemplateContainer;
 
+enum ChallengeModeMedal : uint8
+{
+    CHALLENGE_MEDAL_NONE = 0,
+    CHALLENGE_MEDAL_BRONZE = 1,
+    CHALLENGE_MEDAL_SILVER = 2,
+    CHALLENGE_MEDAL_GOLD = 3
+};
+
+struct ChallengeModeMember
+{
+    uint32 Guid;
+    uint32 SpecId;
+
+    ChallengeModeMember() : Guid(0), SpecId(0) { }
+};
+
+struct RealmCompletedChallenge
+{
+    uint32 GuildId;
+    uint32 AttemptId;
+    uint32 CompletionTime;
+    uint32 CompletionDate;
+    uint8 MedalEarned;
+    uint8 MembersCount;
+    ChallengeModeMember Members[5];
+
+    RealmCompletedChallenge() : GuildId(0), AttemptId(0), CompletionTime(0), CompletionDate(0), MedalEarned(0), MembersCount(0) { }
+};
+
+struct CompletedChallenge
+{
+    uint32 BestTime;
+    uint32 LastTime;
+    uint8 BestMedal;
+    uint32 BestMedalDate;
+
+    CompletedChallenge() : BestTime(0), LastTime(0), BestMedal(0), BestMedalDate(0) { }
+};
+
+struct ChallengeReward
+{
+    uint32 MapId;
+    uint32 MoneyReward[4];
+    uint32 ValorReward[4];
+
+    ChallengeReward() : MapId(0)
+    {
+        memset(MoneyReward, 0, sizeof(MoneyReward));
+        memset(ValorReward, 0, sizeof(ValorReward));
+    }
+};
+
 struct GraveYardData
 {
     uint32 safeLocId;
@@ -1074,6 +1129,16 @@ public:
     void LoadAreaPhases();
 
     void LoadSceneTemplates();
+    void LoadRealmCompletedChallenges();
+    void LoadChallengeRewards();
+    bool GetRealmCompletedChallenge(uint32 mapId, RealmCompletedChallenge& challenge) const;
+    bool GetGuildCompletedChallenge(uint32 mapId, uint32 guildId, RealmCompletedChallenge& challenge) const;
+    void GetCharacterCompletedChallenges(uint32 guidLow, std::map<uint32, CompletedChallenge>& challenges) const;
+    bool RecordCharacterChallenge(uint32 guidLow, uint32 mapId, uint32 completionTime, uint8 medal, CompletedChallenge& stored);
+    bool RecordRealmChallenge(uint32 mapId, RealmCompletedChallenge const& challenge);
+    bool RecordGuildChallenge(uint32 mapId, RealmCompletedChallenge const& challenge);
+    std::vector<ChallengeReward> GetChallengeRewards() const;
+    bool GetChallengeReward(uint32 mapId, ChallengeReward& reward) const;
 
     std::vector<PhaseInfoStruct> const* GetPhaseTerrainSwaps(uint32 phaseid) const
     {
@@ -1629,6 +1694,12 @@ private:
     ResearchDigsiteContainer _researchDigsiteStore;
     ArchaeologyFindContainer _archaeologyFindStore;
     ResearchProjectRequirementContainer _researchProjectRequirementStore;
+
+    std::map<uint32, RealmCompletedChallenge> _realmCompletedChallenges;
+    std::map<std::pair<uint32, uint32>, RealmCompletedChallenge> _guildCompletedChallenges;
+    std::map<uint32, std::map<uint32, CompletedChallenge>> _characterCompletedChallenges;
+    std::map<uint32, ChallengeReward> _challengeRewards;
+    mutable std::mutex _challengeLock;
 };
 
 #define sObjectMgr Skyfire::Singleton<ObjectMgr, Skyfire::NullMutex>::instance()

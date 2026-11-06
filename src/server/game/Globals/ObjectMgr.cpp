@@ -9840,3 +9840,244 @@ SceneTemplate const* ObjectMgr::GetSceneTemplate(uint32 sceneId) const
 
     return &citr->second;
 }
+
+namespace
+{
+    void ReadChallengeMembers(Field* fields, uint32 firstField, RealmCompletedChallenge& challenge)
+    {
+        for (uint8 i = 0; i < 5; ++i)
+        {
+            challenge.Members[i].Guid = fields[firstField + (i * 2)].GetUInt32();
+            challenge.Members[i].SpecId = fields[firstField + (i * 2) + 1].GetUInt32();
+        }
+    }
+
+    void ExecuteChallengeReplace(char const* sql, uint32 mapId, RealmCompletedChallenge const& challenge, bool withGuild)
+    {
+        if (withGuild)
+        {
+            CharacterDatabase.PExecute(sql, mapId, challenge.GuildId, challenge.AttemptId, challenge.CompletionTime, challenge.CompletionDate,
+                uint32(challenge.MedalEarned), uint32(challenge.MembersCount),
+                challenge.Members[0].Guid, challenge.Members[0].SpecId, challenge.Members[1].Guid, challenge.Members[1].SpecId,
+                challenge.Members[2].Guid, challenge.Members[2].SpecId, challenge.Members[3].Guid, challenge.Members[3].SpecId,
+                challenge.Members[4].Guid, challenge.Members[4].SpecId);
+        }
+        else
+        {
+            CharacterDatabase.PExecute(sql, mapId, challenge.AttemptId, challenge.CompletionTime, challenge.CompletionDate,
+                uint32(challenge.MedalEarned), uint32(challenge.MembersCount),
+                challenge.Members[0].Guid, challenge.Members[0].SpecId, challenge.Members[1].Guid, challenge.Members[1].SpecId,
+                challenge.Members[2].Guid, challenge.Members[2].SpecId, challenge.Members[3].Guid, challenge.Members[3].SpecId,
+                challenge.Members[4].Guid, challenge.Members[4].SpecId);
+        }
+    }
+}
+
+void ObjectMgr::LoadRealmCompletedChallenges()
+{
+    uint32 oldMSTime = getMSTime();
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    _realmCompletedChallenges.clear();
+    _guildCompletedChallenges.clear();
+    _characterCompletedChallenges.clear();
+
+    uint32 count = 0;
+    if (QueryResult result = CharacterDatabase.Query("SELECT map, attemptId, completion_time, completion_date, medal_earned, group_members, member_1_guid, member_1_spec, member_2_guid, member_2_spec, member_3_guid, member_3_spec, member_4_guid, member_4_spec, member_5_guid, member_5_spec FROM group_completed_challenges"))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            RealmCompletedChallenge challenge;
+            uint32 mapId = fields[0].GetUInt32();
+            challenge.GuildId = 0;
+            challenge.AttemptId = fields[1].GetUInt32();
+            challenge.CompletionTime = fields[2].GetUInt32();
+            challenge.CompletionDate = fields[3].GetUInt32();
+            challenge.MedalEarned = fields[4].GetUInt8();
+            challenge.MembersCount = fields[5].GetUInt8();
+            ReadChallengeMembers(fields, 6, challenge);
+            _realmCompletedChallenges[mapId] = challenge;
+            ++count;
+        } while (result->NextRow());
+    }
+
+    if (QueryResult result = CharacterDatabase.Query("SELECT map, guildId, attemptId, completion_time, completion_date, medal_earned, guild_members, member_1_guid, member_1_spec, member_2_guid, member_2_spec, member_3_guid, member_3_spec, member_4_guid, member_4_spec, member_5_guid, member_5_spec FROM guild_completed_challenges"))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            RealmCompletedChallenge challenge;
+            uint32 mapId = fields[0].GetUInt32();
+            challenge.GuildId = fields[1].GetUInt32();
+            challenge.AttemptId = fields[2].GetUInt32();
+            challenge.CompletionTime = fields[3].GetUInt32();
+            challenge.CompletionDate = fields[4].GetUInt32();
+            challenge.MedalEarned = fields[5].GetUInt8();
+            challenge.MembersCount = fields[6].GetUInt8();
+            ReadChallengeMembers(fields, 7, challenge);
+            _guildCompletedChallenges[std::make_pair(mapId, challenge.GuildId)] = challenge;
+            ++count;
+        } while (result->NextRow());
+    }
+
+    if (QueryResult result = CharacterDatabase.Query("SELECT guid, map, best_time, last_time, best_medal, best_medal_date FROM character_completed_challenges"))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            CompletedChallenge challenge;
+            uint32 guid = fields[0].GetUInt32();
+            uint32 mapId = fields[1].GetUInt32();
+            challenge.BestTime = fields[2].GetUInt32();
+            challenge.LastTime = fields[3].GetUInt32();
+            challenge.BestMedal = fields[4].GetUInt8();
+            challenge.BestMedalDate = fields[5].GetUInt32();
+            _characterCompletedChallenges[guid][mapId] = challenge;
+            ++count;
+        } while (result->NextRow());
+    }
+
+    SF_LOG_INFO("server.loading", ">> Loaded %u challenge mode records in %u ms.", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadChallengeRewards()
+{
+    uint32 oldMSTime = getMSTime();
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    _challengeRewards.clear();
+
+    QueryResult result = WorldDatabase.Query("SELECT map, none_money, bronze_money, silver_money, gold_money, none_valor, bronze_valor, silver_valor, gold_valor FROM challenge_mode_rewards");
+    if (!result)
+    {
+        SF_LOG_INFO("server.loading", ">> Loaded 0 challenge mode rewards. DB table `challenge_mode_rewards` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        ChallengeReward reward;
+        reward.MapId = fields[0].GetUInt32();
+        for (uint8 i = 0; i < 4; ++i)
+            reward.MoneyReward[i] = fields[1 + i].GetUInt32();
+        for (uint8 i = 0; i < 4; ++i)
+            reward.ValorReward[i] = fields[5 + i].GetUInt32();
+        _challengeRewards[reward.MapId] = reward;
+        ++count;
+    } while (result->NextRow());
+
+    SF_LOG_INFO("server.loading", ">> Loaded %u challenge mode rewards in %u ms.", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+bool ObjectMgr::GetRealmCompletedChallenge(uint32 mapId, RealmCompletedChallenge& challenge) const
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::map<uint32, RealmCompletedChallenge>::const_iterator itr = _realmCompletedChallenges.find(mapId);
+    if (itr == _realmCompletedChallenges.end())
+        return false;
+
+    challenge = itr->second;
+    return true;
+}
+
+bool ObjectMgr::GetGuildCompletedChallenge(uint32 mapId, uint32 guildId, RealmCompletedChallenge& challenge) const
+{
+    if (!guildId)
+        return false;
+
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::map<std::pair<uint32, uint32>, RealmCompletedChallenge>::const_iterator itr = _guildCompletedChallenges.find(std::make_pair(mapId, guildId));
+    if (itr == _guildCompletedChallenges.end())
+        return false;
+
+    challenge = itr->second;
+    return true;
+}
+
+void ObjectMgr::GetCharacterCompletedChallenges(uint32 guidLow, std::map<uint32, CompletedChallenge>& challenges) const
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::map<uint32, std::map<uint32, CompletedChallenge>>::const_iterator itr = _characterCompletedChallenges.find(guidLow);
+    if (itr == _characterCompletedChallenges.end())
+    {
+        challenges.clear();
+        return;
+    }
+
+    challenges = itr->second;
+}
+
+bool ObjectMgr::RecordCharacterChallenge(uint32 guidLow, uint32 mapId, uint32 completionTime, uint8 medal, CompletedChallenge& stored)
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    CompletedChallenge& challenge = _characterCompletedChallenges[guidLow][mapId];
+    bool const firstClear = challenge.BestTime == 0;
+    bool const newBestTime = firstClear || completionTime < challenge.BestTime;
+    bool const newBestMedal = medal > challenge.BestMedal;
+
+    if (newBestTime)
+        challenge.BestTime = completionTime;
+    challenge.LastTime = completionTime;
+    if (newBestMedal || firstClear)
+    {
+        challenge.BestMedal = medal;
+        challenge.BestMedalDate = uint32(time(NULL));
+    }
+    stored = challenge;
+
+    CharacterDatabase.PExecute("REPLACE INTO character_completed_challenges (guid, map, best_time, last_time, best_medal, best_medal_date) VALUES (%u, %u, %u, %u, %u, %u)",
+        guidLow, mapId, challenge.BestTime, challenge.LastTime, uint32(challenge.BestMedal), challenge.BestMedalDate);
+    return newBestTime;
+}
+
+bool ObjectMgr::RecordRealmChallenge(uint32 mapId, RealmCompletedChallenge const& challenge)
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::map<uint32, RealmCompletedChallenge>::iterator itr = _realmCompletedChallenges.find(mapId);
+    if (itr != _realmCompletedChallenges.end() && itr->second.CompletionTime != 0 && itr->second.CompletionTime <= challenge.CompletionTime)
+        return false;
+
+    _realmCompletedChallenges[mapId] = challenge;
+    ExecuteChallengeReplace("REPLACE INTO group_completed_challenges (map, attemptId, completion_time, completion_date, medal_earned, group_members, member_1_guid, member_1_spec, member_2_guid, member_2_spec, member_3_guid, member_3_spec, member_4_guid, member_4_spec, member_5_guid, member_5_spec) VALUES (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u)",
+        mapId, challenge, false);
+    return true;
+}
+
+bool ObjectMgr::RecordGuildChallenge(uint32 mapId, RealmCompletedChallenge const& challenge)
+{
+    if (!challenge.GuildId)
+        return false;
+
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::pair<uint32, uint32> key = std::make_pair(mapId, challenge.GuildId);
+    std::map<std::pair<uint32, uint32>, RealmCompletedChallenge>::iterator itr = _guildCompletedChallenges.find(key);
+    if (itr != _guildCompletedChallenges.end() && itr->second.CompletionTime != 0 && itr->second.CompletionTime <= challenge.CompletionTime)
+        return false;
+
+    _guildCompletedChallenges[key] = challenge;
+    ExecuteChallengeReplace("REPLACE INTO guild_completed_challenges (map, guildId, attemptId, completion_time, completion_date, medal_earned, guild_members, member_1_guid, member_1_spec, member_2_guid, member_2_spec, member_3_guid, member_3_spec, member_4_guid, member_4_spec, member_5_guid, member_5_spec) VALUES (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u)",
+        mapId, challenge, true);
+    return true;
+}
+
+std::vector<ChallengeReward> ObjectMgr::GetChallengeRewards() const
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::vector<ChallengeReward> rewards;
+    rewards.reserve(_challengeRewards.size());
+    for (std::map<uint32, ChallengeReward>::const_iterator itr = _challengeRewards.begin(); itr != _challengeRewards.end(); ++itr)
+        rewards.push_back(itr->second);
+    return rewards;
+}
+
+bool ObjectMgr::GetChallengeReward(uint32 mapId, ChallengeReward& reward) const
+{
+    std::lock_guard<std::mutex> guard(_challengeLock);
+    std::map<uint32, ChallengeReward>::const_iterator itr = _challengeRewards.find(mapId);
+    if (itr == _challengeRewards.end())
+        return false;
+
+    reward = itr->second;
+    return true;
+}

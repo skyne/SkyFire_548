@@ -495,6 +495,16 @@ struct SceneScriptEntry
     uint32 m_nextScriptPartID;                               // 4         m_nextScriptPartID - Next Script Part Id From Chain
 };
 */
+// MapChallengeMode.db2
+struct MapChallengeModeEntry
+{
+    uint32 ID;                                                  // 0
+    uint32 MapID;                                               // 1
+    uint32 BronzeTime;                                          // 5 seconds
+    uint32 SilverTime;                                          // 6
+    uint32 GoldTime;                                            // 7
+};
+
 #define MAX_SPELL_REAGENTS 8
 #define MAX_SPELL_REAGENTS2 10
 
