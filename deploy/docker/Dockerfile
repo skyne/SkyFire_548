@@ -33,6 +33,9 @@ WORKDIR /skyfire
 
 COPY --chmod=755 deploy/docker/entrypoint.sh /skyfire/entrypoint.sh
 COPY --chmod=755 deploy/docker/import-sfdb.sh /skyfire/import-sfdb.sh
+COPY deploy/docker/stage/openssl/ /opt/openssl-4.0.0/
+COPY --chown=skyfire:skyfire deploy/docker/stage/bin/ /skyfire/bin/
+COPY --chown=skyfire:skyfire deploy/docker/stage/etc/ /skyfire/ref/etc/
 
 USER $DOCKER_USER
 ENTRYPOINT ["/usr/bin/env", "bash", "/skyfire/entrypoint.sh"]

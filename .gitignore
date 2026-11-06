@@ -1,5 +1,6 @@
 
 build*/
+deploy/docker/stage/
 Win32*/
 x64*/
 .directory
