@@ -285,12 +285,15 @@ void World::AddSession_(WorldSession* s)
         return;
     }
 
+    s->SendDanceStudioCreateResult();
     s->SendAuthResponse(ResponseCodes::AUTH_OK, false);
     s->SendFeatureSystemStatusGlueScreen();
     s->SendAddonsInfo();
     s->SendClientCacheVersion(sWorld->getIntConfig(WorldIntConfigs::CONFIG_CLIENTCACHE_VERSION));
     if (s->HasBoost())
         s->SendBattlePayDistributionUpdate(0, CHARACTER_BOOST, CHARACTER_BOOST_ALLOW, CHARACTER_BOOST_TEXT_ID, CHARACTER_BOOST_BONUS_TEXT, CHARACTER_BOOST_BONUS_TEXT2);
+    s->SendBattlePayDistributionList();
+    s->SendDisplayPromotion();
     s->SendTutorialsData();
     s->SendTimezoneInformation();
 
@@ -385,10 +388,13 @@ bool World::RemoveQueuedPlayer(WorldSession* sess)
         pop_sess->SetInQueue(false);
         pop_sess->ResetTimeOutTime();
         pop_sess->SendAuthWaitQue(0);
+        pop_sess->SendDanceStudioCreateResult();
         pop_sess->SendFeatureSystemStatusGlueScreen();
         pop_sess->SendAddonsInfo();
 
         pop_sess->SendClientCacheVersion(sWorld->getIntConfig(WorldIntConfigs::CONFIG_CLIENTCACHE_VERSION));
+        pop_sess->SendBattlePayDistributionList();
+        pop_sess->SendDisplayPromotion();
         pop_sess->SendAccountDataTimes(GLOBAL_CACHE_MASK);
         pop_sess->SendTutorialsData();
         pop_sess->SendTimezoneInformation();

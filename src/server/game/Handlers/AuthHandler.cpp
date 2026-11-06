@@ -140,3 +140,33 @@ void WorldSession::SendFeatureSystemStatusGlueScreen()
 
     SendPacket(&data);
 }
+
+void WorldSession::SendBattlePayDistributionList()
+{
+    // Empty list. The character screen waits for this after connect and drops
+    // the session when it never arrives.
+    WorldPacket data(SMSG_BATTLE_PAY_GET_DISTRIBUTION_LIST_RESPONSE, 8);
+    data << uint32(0);
+    data.WriteBits(0, 19);
+    data.FlushBits();
+    SendPacket(&data);
+}
+
+void WorldSession::SendDanceStudioCreateResult()
+{
+    WorldPacket data(SMSG_DANCE_STUDIO_CREATE_RESULT, 17);
+    data << uint32(4665878);
+    data << uint32(795877);
+    data << uint32(10848087);
+    data << uint32(1084761);
+    data.WriteBit(true);
+    data.FlushBits();
+    SendPacket(&data);
+}
+
+void WorldSession::SendDisplayPromotion()
+{
+    WorldPacket data(SMSG_DISPLAY_PROMOTION, 4);
+    data << uint32(0);
+    SendPacket(&data);
+}

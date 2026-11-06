@@ -297,6 +297,9 @@ public:
     void ContinuePlayerLogin();
     void HandleQueuedMessagesEnd(WorldPacket& recvData);
     void SendFeatureSystemStatusGlueScreen();
+    void SendBattlePayDistributionList();
+    void SendDanceStudioCreateResult();
+    void SendDisplayPromotion();
 
     rbac::RBACData* GetRBACData();
     bool HasPermission(uint32 permissionId);
