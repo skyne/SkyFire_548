@@ -187,6 +187,27 @@ set(scripts_STAT_SRCS
   EasternKingdoms/zone_stranglethorn_vale.cpp
   EasternKingdoms/zone_undercity.cpp
   EasternKingdoms/zone_westfall.cpp
+  EasternKingdoms/ScarletHalls/boss_armsmaster_harlan.cpp
+  EasternKingdoms/ScarletHalls/boss_flameweaver_koegler.cpp
+  EasternKingdoms/ScarletHalls/boss_houndmaster_braun.cpp
+  EasternKingdoms/ScarletHalls/instance_scarlet_halls.cpp
+  EasternKingdoms/ScarletHalls/scarlet_halls.cpp
+  EasternKingdoms/ScarletHalls/scarlet_halls.h
+  EasternKingdoms/ScarletMonasteryMoP/boss_brother_korloff.cpp
+  EasternKingdoms/ScarletMonasteryMoP/boss_headless_horseman.cpp
+  EasternKingdoms/ScarletMonasteryMoP/boss_high_inqusitior_whitemane.cpp
+  EasternKingdoms/ScarletMonasteryMoP/boss_thalnos_the_soulrender.cpp
+  EasternKingdoms/ScarletMonasteryMoP/instance_scarlet_monastery.cpp
+  EasternKingdoms/ScarletMonasteryMoP/scarlet_monastery.cpp
+  EasternKingdoms/ScarletMonasteryMoP/scarlet_monastery.h
+  EasternKingdoms/Scholomance/boss_grandmaster_gandling.cpp
+  EasternKingdoms/Scholomance/boss_instructor_chillheart.cpp
+  EasternKingdoms/Scholomance/boss_jandice_barov.cpp
+  EasternKingdoms/Scholomance/boss_lilian_voss.cpp
+  EasternKingdoms/Scholomance/boss_rattlegore.cpp
+  EasternKingdoms/Scholomance/instance_scholomance.cpp
+  EasternKingdoms/Scholomance/scholomance.cpp
+  EasternKingdoms/Scholomance/scholomance.h
 )
 
 message("  -> Prepared: Eastern Kingdoms")

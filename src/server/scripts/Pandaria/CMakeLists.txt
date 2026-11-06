@@ -23,6 +23,32 @@ set(scripts_STAT_SRCS
   Pandaria/MoguShanVault/instance_mogu_shan_vault.cpp
   Pandaria/MoguShanVault/mogu_shan_vault.cpp
   Pandaria/MoguShanVault/mogu_shan_vault.h
+  Pandaria/MogushanPalace/boss_gekkan.cpp
+  Pandaria/MogushanPalace/boss_trial_of_the_king.cpp
+  Pandaria/MogushanPalace/boss_xin_the_weaponmaster.cpp
+  Pandaria/MogushanPalace/instance_mogu_shan_palace.cpp
+  Pandaria/MogushanPalace/mogu_shan_palace.h
+  Pandaria/ShadopanMonastery/boss_gu_cloudstrike.cpp
+  Pandaria/ShadopanMonastery/boss_master_snowdrift.cpp
+  Pandaria/ShadopanMonastery/boss_sha_of_violence.cpp
+  Pandaria/ShadopanMonastery/boss_taran_zhu.cpp
+  Pandaria/ShadopanMonastery/instance_shadopan_monastery.cpp
+  Pandaria/ShadopanMonastery/shadopan_monastery.cpp
+  Pandaria/ShadopanMonastery/shadopan_monastery.h
+  Pandaria/GateOfTheSettingSun/boss_commander_rimok.cpp
+  Pandaria/GateOfTheSettingSun/boss_raigonn.cpp
+  Pandaria/GateOfTheSettingSun/boss_saboteur_kiptilak.cpp
+  Pandaria/GateOfTheSettingSun/boss_striker_gadok.cpp
+  Pandaria/GateOfTheSettingSun/gate_of_the_setting_sun.cpp
+  Pandaria/GateOfTheSettingSun/gate_of_the_setting_sun.h
+  Pandaria/GateOfTheSettingSun/instance_gate_of_the_setting_sun.cpp
+  Pandaria/SiegeOfNiuzaoTemple/boss_commander_vojak.cpp
+  Pandaria/SiegeOfNiuzaoTemple/boss_general_pavalak.cpp
+  Pandaria/SiegeOfNiuzaoTemple/boss_vizier_jinbak.cpp
+  Pandaria/SiegeOfNiuzaoTemple/boss_wing_leader_neronok.cpp
+  Pandaria/SiegeOfNiuzaoTemple/instance_siege_of_niuzao_temple.cpp
+  Pandaria/SiegeOfNiuzaoTemple/siege_of_niuzao_temple.cpp
+  Pandaria/SiegeOfNiuzaoTemple/siege_of_niuzao_temple.h
 )
 
 message("  -> Prepared: Pandaria")
