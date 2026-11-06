@@ -6,6 +6,17 @@ LOGS_DIR="${LOGS_DIR:-/skyfire/logs}"
 REF_DIR="${REF_DIR:-/skyfire/ref/etc}"
 COMPONENT="${SF_COMPONENT:-${1:-worldserver}}"
 
+# The process exits unless the legacy provider loads. The image ships its own
+# OpenSSL under /opt, and the loader does not look there unless told.
+if [[ -z "${OPENSSL_MODULES:-}" ]]; then
+    for modules in /opt/openssl-4.0.0/lib64/ossl-modules /opt/openssl-4.0.0/lib/ossl-modules; do
+        if [[ -d "$modules" ]]; then
+            export OPENSSL_MODULES="$modules"
+            break
+        fi
+    done
+fi
+
 mkdir -p "$CONF_DIR" "$LOGS_DIR"
 
 if ! touch "$CONF_DIR/.write-test" || ! touch "$LOGS_DIR/.write-test"; then
