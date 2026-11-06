@@ -1,0 +1,48 @@
+# Pull the private GHCR images with this job's token and publish them as an
+# artifact. The laptop can download that artifact and load it into k3s without
+# a Tailscale auth key.
+
+name: export-images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  IMAGE_TAG: "548"
+  OWNER: skyne
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save the images
+        shell: bash
+        run: |
+          set -euo pipefail
+          images=()
+          for target in authserver worldserver clustergateway; do
+            image="ghcr.io/${OWNER}/skyfire-${target}:${IMAGE_TAG}"
+            docker pull "$image"
+            images+=("$image")
+          done
+          docker save -o "$RUNNER_TEMP/skyfire-images.tar" "${images[@]}"
+
+      - name: Upload the image archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyfire-images
+          path: ${{ runner.temp }}/skyfire-images.tar
+          retention-days: 1
+          compression-level: 1
