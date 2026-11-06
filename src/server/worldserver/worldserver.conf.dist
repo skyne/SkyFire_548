@@ -3430,3 +3430,25 @@ Boost.StartLevel = 90
 
 #
 ###################################################################################################
+
+###################################################################################################
+# BATTLE PAY SHOP
+#
+#    BattlePay.StoreEnabled
+#        Description: Answer the shop with the SQL catalog, or report the store unavailable.
+#        Default:     1 - (Enabled)
+#                     0 - (Unavailable)
+#
+
+BattlePay.StoreEnabled = 1
+
+#
+#    BattlePay.Currency
+#        Description: Currency id sent with the product list. 16 is the beta currency.
+#        Default:     16
+#
+
+BattlePay.Currency = 16
+
+#
+###################################################################################################

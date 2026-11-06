@@ -142,6 +142,7 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     recruiterId(recruiter),
     isRecruiter(isARecruiter),
     m_hasBoost(hasBoost),
+    m_battlePayPurchase(),
     m_usedEmailLogin(usedEmailLogin),
     m_usesAuthnetWorldHandoff(usesAuthnetWorldHandoff),
     timeLastWhoCommand(0),
@@ -389,6 +390,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
     /// Update Timeout timer.
     UpdateTimeOutTime(diff);
     m_charBooster->Update(diff);
+    UpdateBattlePay(diff);
     UpdatePetBattlePvpQueueState();
 
     if (m_clusterHandedOff)

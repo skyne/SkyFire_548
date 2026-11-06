@@ -251,6 +251,22 @@ protected:
     uint8 CharCount;
 };
 
+struct BattlePayPurchase
+{
+    BattlePayPurchase() : Pending(false), Timer(0), PurchaseId(0), ProductId(0), Status(0), Result(0), ClientToken(0), ServerToken(0), Delivered(false) { }
+
+    bool Pending;
+    uint32 Timer;
+    ObjectGuid Target;
+    uint64 PurchaseId;
+    uint32 ProductId;
+    uint32 Status;
+    uint32 Result;
+    uint32 ClientToken;
+    uint32 ServerToken;
+    bool Delivered;
+};
+
 /// Player session in the World
 class WorldSession
 {
@@ -652,6 +668,12 @@ public:                                                 // opcodes handlers
     void HandleBattlePayCharBoost(WorldPacket& recvPacket);
     void HandleBattlePayGetProductList(WorldPacket& recvPacket);
     void HandleBattlePayGetPurchaseList(WorldPacket& recvPacket);
+    void HandleBattlePayStartPurchase(WorldPacket& recvPacket);
+    void HandleBattlePayConfirmPurchaseResponse(WorldPacket& recvPacket);
+    void UpdateBattlePay(uint32 diff);
+    void BeginBattlePayPurchase(BattlePayPurchase purchase, uint32 delayMs);
+    BattlePayPurchase& GetBattlePayPurchase() { return m_battlePayPurchase; }
+    BattlePayPurchase const& GetBattlePayPurchase() const { return m_battlePayPurchase; }
 
     // new
     void HandleMoveUnRootAck(WorldPacket& recvPacket);
@@ -1355,6 +1377,7 @@ private:
     uint32 recruiterId;
     bool isRecruiter;
     bool m_hasBoost;
+    BattlePayPurchase m_battlePayPurchase;
     bool m_usedEmailLogin;
     bool m_usesAuthnetWorldHandoff;
     Skyfire::LockedQueue<WorldPacket*, Skyfire::Mutex> _recvQueue;

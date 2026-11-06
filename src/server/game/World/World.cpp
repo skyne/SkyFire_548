@@ -14,6 +14,7 @@
 #include "AuctionHouseMgr.h"
 #include "BattlefieldMgr.h"
 #include "BattlegroundMgr.h"
+#include "BattlePayMgr.h"
 #include "BattlePetMgr.h"
 #include "BattlePetSpawnMgr.h"
 #include "BlackMarketMgr.h"
@@ -1167,6 +1168,10 @@ void World::LoadConfigSettings(bool reload)
     setIntConfig(WorldIntConfigs::CONFIG_BOOST_START_MONEY, sConfigMgr->GetIntDefault("Boost.StartMoney", 1500000));
     setIntConfig(WorldIntConfigs::CONFIG_BOOST_START_LEVEL, sConfigMgr->GetIntDefault("Boost.StartLevel", 90));
 
+    // in-game shop
+    SetBoolConfig(WorldBoolConfigs::CONFIG_BATTLE_PAY_STORE_ENABLED, sConfigMgr->GetBoolDefault("BattlePay.StoreEnabled", true));
+    setIntConfig(WorldIntConfigs::CONFIG_BATTLE_PAY_CURRENCY, sConfigMgr->GetIntDefault("BattlePay.Currency", 16));
+
     //visibility on continents
     m_MaxVisibleDistanceOnContinents = sConfigMgr->GetFloatDefault("Visibility.Distance.Continents", DEFAULT_VISIBILITY_DISTANCE);
     if (m_MaxVisibleDistanceOnContinents < 45 * sWorld->getRate(Rates::RATE_CREATURE_AGGRO))
@@ -2055,6 +2060,9 @@ void World::SetInitialWorldSettings()
 
     SF_LOG_INFO("server.loading", "Loading BlackMarket Templates...");
     sBlackMarketMgr->LoadBlackMarketTemplates();
+
+    SF_LOG_INFO("server.loading", "Loading Battle Pay store...");
+    sBattlePayMgr->LoadFromDb();
 
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 
