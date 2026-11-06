@@ -23,6 +23,27 @@ set(scripts_STAT_SRCS
   Pandaria/MoguShanVault/instance_mogu_shan_vault.cpp
   Pandaria/MoguShanVault/mogu_shan_vault.cpp
   Pandaria/MoguShanVault/mogu_shan_vault.h
+  Pandaria/ScriptCompat/TaskScheduler.cpp
+  Pandaria/ScriptCompat/pandaria_script_compat.cpp
+  Pandaria/ScriptCompat/TaskScheduler.h
+  Pandaria/ScriptCompat/Duration.h
+  Pandaria/ScriptCompat/pandaria_script_compat.h
+  Pandaria/HeartOfFear/boss_garalon.cpp
+  Pandaria/HeartOfFear/boss_meljarak.cpp
+  Pandaria/HeartOfFear/boss_shekzeer.cpp
+  Pandaria/HeartOfFear/boss_tayak.cpp
+  Pandaria/HeartOfFear/boss_unsok.cpp
+  Pandaria/HeartOfFear/boss_zorlok.cpp
+  Pandaria/HeartOfFear/heart_of_fear.cpp
+  Pandaria/HeartOfFear/heart_of_fear.h
+  Pandaria/HeartOfFear/instance_heart_of_fear.cpp
+  Pandaria/TerraceOfEndlessSpring/boss_lei_shi.cpp
+  Pandaria/TerraceOfEndlessSpring/boss_protectors_of_the_endless.cpp
+  Pandaria/TerraceOfEndlessSpring/boss_sha_of_fear.cpp
+  Pandaria/TerraceOfEndlessSpring/boss_tsulong.cpp
+  Pandaria/TerraceOfEndlessSpring/instance_terrace_of_endless_spring.cpp
+  Pandaria/TerraceOfEndlessSpring/terrace_of_endless_spring.cpp
+  Pandaria/TerraceOfEndlessSpring/terrace_of_endless_spring.h
 )
 
 message("  -> Prepared: Pandaria")

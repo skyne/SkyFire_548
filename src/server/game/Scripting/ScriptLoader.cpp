@@ -634,6 +634,22 @@ void AddSC_boss_stone_guard();
 void AddSC_boss_will_of_emperor();
 void AddSC_instance_mogu_shan_vault();
 void AddSC_mogu_shan_vault();
+// Heart of Fear
+void AddSC_boss_garalon();
+void AddSC_boss_meljarak();
+void AddSC_boss_shekzeer();
+void AddSC_boss_tayak();
+void AddSC_boss_unsok();
+void AddSC_boss_zorlok();
+void AddSC_heart_of_fear();
+void AddSC_instance_heart_of_fear();
+// Terrace of Endless Spring
+void AddSC_boss_lei_shi();
+void AddSC_boss_protectors_of_the_endless();
+void AddSC_boss_sha_of_fear();
+void AddSC_boss_tsulong();
+void AddSC_instance_terrace_of_endless_spring();
+void AddSC_terrace_of_endless_spring();
 // Temple of Jade Serpent
 void AddSC_instance_jade_serpent();
 // Stormstout Brewery
@@ -1361,6 +1377,22 @@ void AddPandariaScripts()
     AddSC_boss_will_of_emperor();
     AddSC_instance_mogu_shan_vault();
     AddSC_mogu_shan_vault();
+    // Heart of Fear
+    AddSC_boss_garalon();
+    AddSC_boss_meljarak();
+    AddSC_boss_shekzeer();
+    AddSC_boss_tayak();
+    AddSC_boss_unsok();
+    AddSC_boss_zorlok();
+    AddSC_heart_of_fear();
+    AddSC_instance_heart_of_fear();
+    // Terrace of Endless Spring
+    AddSC_boss_lei_shi();
+    AddSC_boss_protectors_of_the_endless();
+    AddSC_boss_sha_of_fear();
+    AddSC_boss_tsulong();
+    AddSC_instance_terrace_of_endless_spring();
+    AddSC_terrace_of_endless_spring();
     // Temple of Jade Serpent - Temple of Jade Serpent
     AddSC_instance_jade_serpent();
     // Stormstout Brewery
