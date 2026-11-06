@@ -9,6 +9,7 @@
 
 #include "AccountMgr.h"
 #include "AuthnetConnectTo.h"
+#include "Cluster/ClusterLinkSession.h"
 #include "BattlegroundMgr.h"
 #include "CharacterBoost.h"
 #include "Common.h"
@@ -95,6 +96,16 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     _player(NULL),
     m_Socket(sock),
     m_InstanceSocket(NULL),
+    m_clusterLink(NULL),
+    m_clusterHandedOff(false),
+    m_clusterResumePending(false),
+    m_clusterResumeGuid(0),
+    m_clusterResumeMap(0),
+    m_clusterResumeX(0.f),
+    m_clusterResumeY(0.f),
+    m_clusterResumeZ(0.f),
+    m_clusterResumeO(0.f),
+    m_clusterResumeOptions(0),
     m_WorldAuthLogin(std::move(worldAuthLogin)),
     m_WorldSessionKey(worldSessionKey),
     m_InstanceConnectKey(0),
@@ -168,6 +179,13 @@ WorldSession::~WorldSession()
         m_InstanceSocket = NULL;
     }
 
+    if (m_clusterLink)
+    {
+        m_clusterLink->DetachWorldSession();
+        m_clusterLink->Close();
+        m_clusterLink = NULL;
+    }
+
     /// - If have unclosed socket, close it
     if (m_Socket)
     {
@@ -218,10 +236,36 @@ uint32 WorldSession::GetGuidLow() const
 }
 
 /// Send a packet to the client
+void WorldSession::SetClusterLink(ClusterLinkSession* link)
+{
+    m_clusterLink = link;
+    if (m_clusterLink)
+        ResetTimeOutTime();
+}
+
+void WorldSession::FinishClusterHandoff()
+{
+    m_clusterHandedOff = true;
+    if (m_clusterLink)
+    {
+        m_clusterLink->DetachWorldSession();
+        m_clusterLink = NULL;
+    }
+}
+
+bool WorldSession::HasActiveClient() const
+{
+    if (m_Socket && !m_Socket->IsClosed())
+        return true;
+    if (m_clusterLink && !m_clusterLink->IsClosed())
+        return true;
+    return false;
+}
+
 void WorldSession::SendPacket(WorldPacket const* packet, bool forced /*= false*/)
 {
     WorldSocket* socket = m_InstanceSocket ? m_InstanceSocket : m_Socket;
-    if (!socket)
+    if (!socket && !m_clusterLink)
         return;
 
     if (packet->GetOpcode() == NULL_OPCODE)
@@ -286,6 +330,12 @@ void WorldSession::SendPacket(WorldPacket const* packet, bool forced /*= false*/
     }
 #endif                                                      // !SKYFIRE_DEBUG
 
+    if (m_clusterLink)
+    {
+        m_clusterLink->SendWowPacket(*packet);
+        return;
+    }
+
     if (socket->SendPacket(*packet) == -1)
         socket->CloseSocket();
 }
@@ -325,15 +375,40 @@ void WorldSession::LogUnprocessedTail(WorldPacket* packet) const
 /// Update the WorldSession (triggered by World update)
 bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 {
+    /// Cluster sessions have no WorldSocket keep-alives (gateway eats PING).
+    if (m_clusterLink && !m_clusterLink->IsClosed())
+        ResetTimeOutTime();
+
     /// Update Timeout timer.
     UpdateTimeOutTime(diff);
     m_charBooster->Update(diff);
     UpdatePetBattlePvpQueueState();
 
+    if (m_clusterHandedOff)
+    {
+        if (_player)
+        {
+            if (Map* map = _player->FindMap())
+                map->RemovePlayerFromMap(_player, true);
+            else
+            {
+                _player->CleanupsBeforeDelete();
+                delete _player;
+            }
+            SetPlayer(NULL);
+        }
+        return false;
+    }
+
     ///- Before we process anything:
     /// If necessary, kick the player from the character select screen
-    if (m_Socket && IsConnectionIdle())
-        m_Socket->CloseSocket();
+    if (IsConnectionIdle())
+    {
+        if (m_Socket)
+            m_Socket->CloseSocket();
+        if (m_clusterLink)
+            m_clusterLink->Close();
+    }
 
     ///- Retrieve packets from the receive queue and call the appropriate handlers
     /// not process packets if socket already closed
@@ -349,7 +424,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
     //! and continue updating others. The re-enqueued packets will be handled in the next Update call for this session.
     uint32 processedPackets = 0;
 
-    while (m_Socket && !m_Socket->IsClosed() &&
+    while (HasActiveClient() &&
         !_recvQueue.empty() && _recvQueue.peek(true) != firstDelayedPacket &&
         _recvQueue.next(packet, updater))
     {
@@ -493,7 +568,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
             m_InstanceSocket = NULL;
         }
 
-        if (!m_Socket)
+        if (!HasActiveClient())
             return false;                                       //Will remove this session from the world session map
     }
 
@@ -727,6 +802,8 @@ void WorldSession::KickPlayer()
 {
     if (m_Socket)
         m_Socket->CloseSocket();
+    if (m_clusterLink)
+        m_clusterLink->Close();
 }
 
 void WorldSession::SendNotification(const char* format, ...)
@@ -1248,7 +1325,10 @@ void WorldSession::ProcessQueryCallbacks()
     {
         SQLQueryHolder* param;
         _charLoginCallback.get(param);
-        HandlePlayerLogin((LoginQueryHolder*)param);
+        if (m_clusterResumePending)
+            HandleClusterResumeLogin((LoginQueryHolder*)param);
+        else
+            HandlePlayerLogin((LoginQueryHolder*)param);
         _charLoginCallback.cancel();
     }
 

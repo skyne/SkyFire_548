@@ -561,6 +561,12 @@ bool Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
     if (oldMap->GetId() != newMapid)
     {
         Map* newMap = sMapMgr->CreateBaseMap(newMapid);
+        if (!newMap)
+        {
+            SF_LOG_ERROR("entities.transport", "Transport %u cannot teleport to unowned map %u", GetEntry(), newMapid);
+            return false;
+        }
+
         Map::PlayerList const& oldPlayers = GetMap()->GetPlayers();
         if (!oldPlayers.isEmpty())
         {

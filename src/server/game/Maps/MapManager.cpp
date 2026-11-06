@@ -4,6 +4,7 @@
 */
 
 #include "CellImpl.h"
+#include "ClusterMgr.h"
 #include "Config.h"
 #include "Corpse.h"
 #include "DatabaseEnv.h"
@@ -25,6 +26,7 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include <vector>
 
 extern GridState* si_GridStates[];                          // debugging code, should be deleted some day
 
@@ -86,6 +88,12 @@ void MapManager::checkAndCorrectGridStatesArray()
 
 Map* MapManager::CreateBaseMap(uint32 id)
 {
+    if (!sClusterMgr->OwnsMap(id))
+    {
+        SF_LOG_DEBUG("maps", "MapManager::CreateBaseMap: map %u is not owned by this cluster node", id);
+        return NULL;
+    }
+
     Map* map = FindBaseMap(id);
 
     if (!map)
@@ -173,6 +181,9 @@ Map* MapManager::FindMap(uint32 mapid, uint32 instanceId) const
 
 bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
 {
+    if (!sClusterMgr->OwnsMap(mapid))
+        return false;
+
     MapEntry const* entry = sMapStore.LookupEntry(mapid);
     if (!entry)
         return false;
@@ -338,6 +349,45 @@ bool MapManager::IsValidMAP(uint32 mapid, bool startUp)
         return mEntry && (!mEntry->IsInstance() || sObjectMgr->GetInstanceTemplate(mapid));
 
     /// @todo add check for battleground template
+}
+
+namespace
+{
+void KickPlayersOnMap(Map* map)
+{
+    if (!map)
+        return;
+
+    std::vector<WorldSession*> sessions;
+    Map::PlayerList const& players = map->GetPlayers();
+    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
+        if (Player* player = itr->GetSource())
+            if (WorldSession* session = player->GetSession())
+                sessions.push_back(session);
+
+    for (WorldSession* session : sessions)
+        session->KickPlayer();
+}
+}
+
+void MapManager::KickPlayersOnUnownedMaps()
+{
+    std::lock_guard<std::mutex> guard(Lock);
+    for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
+    {
+        if (sClusterMgr->OwnsMap(iter->first))
+            continue;
+
+        Map* map = iter->second;
+        if (map->Instanceable())
+        {
+            MapInstanced::InstancedMaps& instances = ((MapInstanced*)map)->GetInstancedMaps();
+            for (MapInstanced::InstancedMaps::iterator inst = instances.begin(); inst != instances.end(); ++inst)
+                KickPlayersOnMap(inst->second);
+        }
+        KickPlayersOnMap(map);
+        SF_LOG_INFO("maps", "Kicked players from map %u after cluster ownership change.", iter->first);
+    }
 }
 
 void MapManager::UnloadAll()

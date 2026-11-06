@@ -315,6 +315,78 @@ Authnet.VerboseLogging = 0
 BindIP = "0.0.0.0"
 
 #
+#    Cluster.Enabled
+#        Description: Register this world as a map-ID shard. Stock 18414 play stays off.
+#        Default:     0 - (Disabled, one world owns every map, clients connect here)
+
+Cluster.Enabled = 0
+
+#
+#    Cluster.NodeId
+#        Description: Unique node id inside the realm. Required when Cluster.Enabled = 1.
+
+Cluster.NodeId = 1
+
+#
+#    Cluster.AvailableMaps
+#        Description: Comma-separated mapIds this process may simulate. Empty = all maps.
+#        Example:     "0,1" or "870"
+#        Default:     ""
+
+Cluster.AvailableMaps = ""
+
+#
+#    Cluster.LinkPort
+#        Description: Private ClusterLink port. Never put this in realmlist.
+
+Cluster.LinkPort = 8086
+
+#
+#    Cluster.LinkBindIP
+#        Description: Bind address for ClusterLink. Keep this cluster-internal.
+
+Cluster.LinkBindIP = "127.0.0.1"
+
+#
+#    Cluster.AdvertisedHost
+#        Description: Host other nodes/gateway use to reach ClusterLink.
+
+Cluster.AdvertisedHost = "127.0.0.1"
+
+#
+#    Cluster.SharedToken
+#        Description: Shared hello token between worlds and clustergateway.
+
+Cluster.SharedToken = ""
+
+#
+#    Cluster.HideWorldPort
+#        Description: When 1, do not bind WorldServerPort. Clients must use clustergateway.
+#        Default:     0 - (Keep stock 8085 listener while developing)
+
+Cluster.HideWorldPort = 0
+
+#
+#    Cluster.HeartbeatInterval
+#        Description: Milliseconds between registry heartbeats.
+
+Cluster.HeartbeatInterval = 5000
+
+#
+#    Cluster.StaleSeconds
+#        Description: Seconds after which a node heartbeat is treated as dead.
+
+Cluster.StaleSeconds = 30
+
+#
+#    Cluster.MigrationTimeout
+#        Description: Seconds a player may stay in combat/cast/fall before a pending map-owner
+#                     handoff is forced. Taxi flights migrate immediately.
+#        Default:     300
+
+Cluster.MigrationTimeout = 300
+
+#
 ###################################################################################################
 
 ###################################################################################################

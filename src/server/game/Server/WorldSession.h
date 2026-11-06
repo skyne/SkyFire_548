@@ -33,6 +33,7 @@ class Player;
 class Quest;
 class SpellCastTargets;
 class Unit;
+class ClusterLinkSession;
 class Warden;
 class WorldPacket;
 class WorldSocket;
@@ -262,7 +263,15 @@ public:
     bool PlayerLogout() const { return m_playerLogout; }
     bool PlayerLogoutWithSave() const { return m_playerLogout && m_playerSave; }
     bool PlayerRecentlyLoggedOut() const { return m_playerRecentlyLogout; }
-    bool PlayerDisconnected() const { return !m_Socket; }
+    bool PlayerDisconnected() const { return !m_Socket && !m_clusterLink; }
+    bool HasActiveClient() const;
+    void SetClusterLink(ClusterLinkSession* link);
+    ClusterLinkSession* GetClusterLink() const { return m_clusterLink; }
+    void FinishClusterHandoff();
+    void StartClusterResume(uint32 characterGuid, uint32 mapId, float x, float y, float z, float o, uint32 options);
+    void StartClusterLogin(uint32 characterGuid);
+    void HandleClusterResumeLogin(LoginQueryHolder* holder);
+    void SetRemoteAddress(std::string const& address) { m_Address = address; }
 
     void ReadAddonsInfo(WorldPacket& data);
     void SendAddonsInfo();
@@ -1257,6 +1266,16 @@ private:
     Player* _player;
     WorldSocket* m_Socket;
     WorldSocket* m_InstanceSocket;
+    ClusterLinkSession* m_clusterLink;
+    bool m_clusterHandedOff;
+    bool m_clusterResumePending;
+    uint32 m_clusterResumeGuid;
+    uint32 m_clusterResumeMap;
+    float m_clusterResumeX;
+    float m_clusterResumeY;
+    float m_clusterResumeZ;
+    float m_clusterResumeO;
+    uint32 m_clusterResumeOptions;
     std::string m_Address;
     std::string m_WorldAuthLogin;
     SessionKey m_WorldSessionKey;

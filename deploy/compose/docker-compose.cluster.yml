@@ -1,0 +1,338 @@
+# Map-ID cluster stack: MySQL, auth, C++ clustergateway, continent world nodes.
+# Do not combine with the repository-root docker-compose.yml (port + DB clash).
+# Native host mysqld is not used.
+#
+# From the repository root:
+#   docker compose -f deploy/compose/docker-compose.cluster.yml up -d --build
+#
+# Clients hit auth :3724 and the gateway world proxy :8085 (not world containers).
+
+name: skyfire-cluster
+
+x-build-args: &build-args
+  USER_ID: ${DOCKER_USER_ID:-1000}
+  GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+  DOCKER_USER: ${DOCKER_USER:-skyfire}
+
+x-db-login: &db-login
+  SF_LOGIN_DATABASE_INFO: "\"sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};auth\""
+
+x-world-env: &world-env
+  SF_COMPONENT: worldserver
+  SF_DATA_DIR: /skyfire/data
+  SF_LOGIN_DATABASE_INFO: "\"sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};auth\""
+  SF_WORLD_DATABASE_INFO: "\"sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};world\""
+  SF_CHARACTER_DATABASE_INFO: "\"sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};characters\""
+  SF_CLUSTER_ENABLED: "1"
+  SF_CLUSTER_LINK_PORT: "8086"
+  SF_CLUSTER_LINK_BIND_IP: "0.0.0.0"
+  SF_CLUSTER_SHARED_TOKEN: "${DOCKER_CLUSTER_TOKEN:-skyfire-cluster}"
+  SF_CLUSTER_HIDE_WORLD_PORT: "1"
+  SF_REALM_ID: "1"
+  LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
+
+x-world-base: &world-base
+  image: skyfire/548-worldserver:${DOCKER_IMAGE_TAG:-local}
+  networks:
+    - sf-network
+  stdin_open: true
+  tty: true
+  restart: unless-stopped
+  env_file:
+    - ${DOCKER_SF_ENV_FILE:-../../conf/dist/env.sf}
+  volumes:
+    - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+    - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+    - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+    - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+  depends_on:
+    sf-database:
+      condition: service_healthy
+    sf-db-import:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD-SHELL", "bash -c 'echo >/dev/tcp/127.0.0.1/8086'"]
+    interval: 15s
+    timeout: 5s
+    retries: 40
+    start_period: 90s
+
+services:
+  sf-database:
+    container_name: sf-database
+    image: mysql:8.4
+    networks:
+      - sf-network
+    ports:
+      - ${DOCKER_DB_EXTERNAL_PORT:-3306}:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ${DOCKER_VOL_DB:-sf-database}:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: "/usr/bin/mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute \"SHOW DATABASES;\""
+      interval: 5s
+      timeout: 10s
+      retries: 40
+
+  sf-db-import:
+    container_name: sf-db-import
+    image: skyfire/548-db-import:${DOCKER_IMAGE_TAG:-local}
+    networks:
+      - sf-network
+    build:
+      context: ../..
+      target: db-import
+      dockerfile: deploy/docker/Dockerfile
+      args: *build-args
+    environment:
+      MYSQL_HOST: sf-database
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ../../sql:/sql:ro
+      - ${DOCKER_VOL_SFDB:-../../var/sfdb}:/sfdb
+    depends_on:
+      sf-database:
+        condition: service_healthy
+
+  sf-realmlist-init:
+    container_name: sf-realmlist-init
+    image: mysql:8.4
+    networks:
+      - sf-network
+    depends_on:
+      sf-db-import:
+        condition: service_completed_successfully
+    environment:
+      MYSQL_PWD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    command:
+      - mysql
+      - -hsf-database
+      - -uroot
+      - auth
+      - -e
+      - UPDATE realmlist SET address='${DOCKER_REALMLIST_ADDRESS:-127.0.0.1}',
+        port=${DOCKER_WORLD_EXTERNAL_PORT:-8085} WHERE id=1;
+
+  sf-authserver:
+    container_name: sf-authserver
+    image: skyfire/548-authserver:${DOCKER_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      target: authserver
+      dockerfile: deploy/docker/Dockerfile
+      args: *build-args
+    networks:
+      - sf-network
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ${DOCKER_SF_ENV_FILE:-../../conf/dist/env.sf}
+    environment:
+      SF_COMPONENT: authserver
+      <<: *db-login
+      LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/auth:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/auth:/skyfire/logs:delegated
+      - ../../src/server/authserver/authserver.conf.dist:/skyfire/ref/etc/authserver.conf.dist:ro
+      - ${DOCKER_BIN_AUTHSERVER:-../../build/src/server/authserver/authserver}:/skyfire/bin/authserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+    ports:
+      - ${DOCKER_AUTH_EXTERNAL_PORT:-3724}:3724
+    depends_on:
+      sf-database:
+        condition: service_healthy
+      sf-db-import:
+        condition: service_completed_successfully
+      sf-realmlist-init:
+        condition: service_completed_successfully
+
+  sf-world-oldworld:
+    <<: *world-base
+    build:
+      context: ../..
+      target: worldserver
+      dockerfile: deploy/docker/Dockerfile
+      args: *build-args
+    container_name: sf-world-oldworld
+    environment:
+      <<: *world-env
+      SF_CLUSTER_NODE_ID: "1"
+      SF_CLUSTER_AVAILABLE_MAPS: "0,1"
+      SF_CLUSTER_ADVERTISED_HOST: sf-world-oldworld
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/oldworld:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/oldworld:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+
+  sf-world-outland:
+    <<: *world-base
+    container_name: sf-world-outland
+    environment:
+      <<: *world-env
+      SF_CLUSTER_NODE_ID: "2"
+      SF_CLUSTER_AVAILABLE_MAPS: "530"
+      SF_CLUSTER_ADVERTISED_HOST: sf-world-outland
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/outland:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/outland:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+
+  sf-world-northrend:
+    <<: *world-base
+    container_name: sf-world-northrend
+    environment:
+      <<: *world-env
+      SF_CLUSTER_NODE_ID: "3"
+      SF_CLUSTER_AVAILABLE_MAPS: "571"
+      SF_CLUSTER_ADVERTISED_HOST: sf-world-northrend
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/northrend:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/northrend:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+
+  sf-world-pandaria:
+    <<: *world-base
+    container_name: sf-world-pandaria
+    environment:
+      <<: *world-env
+      SF_CLUSTER_NODE_ID: "4"
+      SF_CLUSTER_AVAILABLE_MAPS: "860,870"
+      SF_CLUSTER_ADVERTISED_HOST: sf-world-pandaria
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/pandaria:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/pandaria:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+
+  sf-world-bg:
+    <<: *world-base
+    container_name: sf-world-bg
+    environment:
+      <<: *world-env
+      SF_CLUSTER_NODE_ID: "5"
+      SF_CLUSTER_AVAILABLE_MAPS: "30,489,529,566,607,628,726,727,761,998,1105"
+      SF_CLUSTER_ADVERTISED_HOST: sf-world-bg
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/bg:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/bg:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ../../src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-../../build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+
+  sf-clustergateway:
+    container_name: sf-clustergateway
+    image: skyfire/548-clustergateway:${DOCKER_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      target: clustergateway
+      dockerfile: deploy/docker/Dockerfile
+      args: *build-args
+    networks:
+      - sf-network
+    restart: unless-stopped
+    ports:
+      - ${DOCKER_CLUSTER_ADMIN_PORT:-8090}:8090
+    env_file:
+      - ${DOCKER_SF_ENV_FILE:-../../conf/dist/env.sf}
+    environment:
+      SF_COMPONENT: clustergateway
+      <<: *db-login
+      SF_BIND_IP: "0.0.0.0"
+      SF_WORLD_SERVER_PORT: "8085"
+      SF_CLUSTER_REALM_ID: "1"
+      SF_CLUSTER_SHARED_TOKEN: "${DOCKER_CLUSTER_TOKEN:-skyfire-cluster}"
+      SF_CLUSTER_ADMIN_BIND_IP: "0.0.0.0"
+      SF_CLUSTER_ADMIN_PORT: "8090"
+      SF_CHARACTER_DATABASE_INFO: "\"sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};characters\""
+      SF_GATEWAY_PROXY_PROTOCOL: "1"
+      LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
+    volumes:
+      - ${DOCKER_VOL_ETC:-../../env/dist/etc}/gateway:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}/gateway:/skyfire/logs:delegated
+      - ../../src/server/clustergateway/clustergateway.conf.dist:/skyfire/ref/etc/clustergateway.conf.dist:ro
+      - ${DOCKER_BIN_GATEWAY:-../../build/src/server/clustergateway/clustergateway}:/skyfire/bin/clustergateway:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+    depends_on:
+      sf-database:
+        condition: service_healthy
+      sf-db-import:
+        condition: service_completed_successfully
+      sf-world-oldworld:
+        condition: service_started
+      sf-world-outland:
+        condition: service_started
+      sf-world-northrend:
+        condition: service_started
+      sf-world-pandaria:
+        condition: service_started
+      sf-world-bg:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo >/dev/tcp/127.0.0.1/8085'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  sf-dashboard:
+    container_name: sf-dashboard
+    image: node:22-alpine
+    networks:
+      - sf-network
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.js"]
+    ports:
+      - ${DOCKER_DASHBOARD_PORT:-3000}:3000
+    environment:
+      DASHBOARD_PORT: "3000"
+      DASHBOARD_BIND: "0.0.0.0"
+      GATEWAY_ADMIN: http://sf-clustergateway:8090
+      LOGS_ROOT: /logs
+      GATEWAY_CONTAINER: sf-clustergateway
+    volumes:
+      - ../../deploy/dashboard:/app:ro
+      - ${DOCKER_VOL_LOGS:-../../env/dist/logs}:/logs:ro
+    depends_on:
+      sf-clustergateway:
+        condition: service_started
+      sf-database:
+        condition: service_healthy
+
+  sf-haproxy:
+    container_name: sf-haproxy
+    image: haproxy:2.8
+    networks:
+      - sf-network
+    restart: unless-stopped
+    ports:
+      - ${DOCKER_WORLD_EXTERNAL_PORT:-8085}:8085
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      sf-authserver:
+        condition: service_started
+      sf-clustergateway:
+        condition: service_started
+
+volumes:
+  sf-database:
+  sf-client-data:
+
+networks:
+  sf-network:

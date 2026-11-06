@@ -1,0 +1,128 @@
+# Stock SkyFire 5.4.8 stack: MySQL, SFDB import, auth, one world.
+# Start: docker compose up -d --build
+# Do not combine with deploy/compose/docker-compose.cluster.yml (port + DB clash).
+# Native host mysqld is not used. If 3306 is already taken, set DOCKER_DB_EXTERNAL_PORT.
+
+services:
+  sf-database:
+    container_name: sf-database
+    image: mysql:8.4
+    networks:
+      - sf-network
+    ports:
+      - ${DOCKER_DB_EXTERNAL_PORT:-3306}:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ${DOCKER_VOL_DB:-sf-database}:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: "/usr/bin/mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute \"SHOW DATABASES;\""
+      interval: 5s
+      timeout: 10s
+      retries: 40
+
+  sf-db-import:
+    container_name: sf-db-import
+    image: skyfire/548-db-import:${DOCKER_IMAGE_TAG:-local}
+    build:
+      context: .
+      target: db-import
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-skyfire}
+    networks:
+      - sf-network
+    environment:
+      MYSQL_HOST: sf-database
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ./sql:/sql:ro
+      - ${DOCKER_VOL_SFDB:-./var/sfdb}:/sfdb
+    depends_on:
+      sf-database:
+        condition: service_healthy
+
+  sf-worldserver:
+    container_name: sf-worldserver
+    image: skyfire/548-worldserver:${DOCKER_IMAGE_TAG:-local}
+    build:
+      context: .
+      target: worldserver
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-skyfire}
+    networks:
+      - sf-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ${DOCKER_SF_ENV_FILE:-conf/dist/env.sf}
+    environment:
+      SF_COMPONENT: worldserver
+      SF_DATA_DIR: /skyfire/data
+      SF_LOGIN_DATABASE_INFO: "sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};auth"
+      SF_WORLD_DATABASE_INFO: "sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};world"
+      SF_CHARACTER_DATABASE_INFO: "sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};characters"
+      LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
+    ports:
+      - ${DOCKER_WORLD_EXTERNAL_PORT:-8085}:8085
+    volumes:
+      - ${DOCKER_VOL_ETC:-./env/dist/etc}:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-./env/dist/logs}:/skyfire/logs:delegated
+      - ${DOCKER_VOL_DATA:-sf-client-data}:/skyfire/data/:ro
+      - ./src/server/worldserver/worldserver.conf.dist:/skyfire/ref/etc/worldserver.conf.dist:ro
+      - ${DOCKER_BIN_WORLDSERVER:-./build/src/server/worldserver/worldserver}:/skyfire/bin/worldserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+    depends_on:
+      sf-database:
+        condition: service_healthy
+      sf-db-import:
+        condition: service_completed_successfully
+
+  sf-authserver:
+    container_name: sf-authserver
+    image: skyfire/548-authserver:${DOCKER_IMAGE_TAG:-local}
+    build:
+      context: .
+      target: authserver
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-skyfire}
+    networks:
+      - sf-network
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ${DOCKER_SF_ENV_FILE:-conf/dist/env.sf}
+    environment:
+      SF_COMPONENT: authserver
+      SF_LOGIN_DATABASE_INFO: "sf-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};auth"
+      LD_LIBRARY_PATH: /opt/openssl-4.0.0/lib64
+    volumes:
+      - ${DOCKER_VOL_ETC:-./env/dist/etc}:/skyfire/etc
+      - ${DOCKER_VOL_LOGS:-./env/dist/logs}:/skyfire/logs:delegated
+      - ./src/server/authserver/authserver.conf.dist:/skyfire/ref/etc/authserver.conf.dist:ro
+      - ${DOCKER_BIN_AUTHSERVER:-./build/src/server/authserver/authserver}:/skyfire/bin/authserver:ro
+      - /opt/openssl-4.0.0/lib64:/opt/openssl-4.0.0/lib64:ro
+    ports:
+      - ${DOCKER_AUTH_EXTERNAL_PORT:-3724}:3724
+    depends_on:
+      sf-database:
+        condition: service_healthy
+      sf-db-import:
+        condition: service_completed_successfully
+
+volumes:
+  sf-database:
+  sf-client-data:
+
+networks:
+  sf-network:

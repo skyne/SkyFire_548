@@ -1,0 +1,66 @@
+################################################
+#   SkyFire Cluster Gateway configuration file  #
+################################################
+[clustergateway]
+ConfVersion=2026110601
+
+#
+#    BindIP
+#        Description: Public client bind address. Realmlist should point here.
+BindIP = "0.0.0.0"
+
+#
+#    WorldServerPort
+#        Description: Public world TCP port advertised in realmlist (5.4.8 default 8085).
+WorldServerPort = 8085
+
+#
+#    Gateway.ProxyProtocol
+#        Description: Expect PROXY protocol v2 on accepted client sockets (HAProxy send-proxy-v2).
+#        Default:     0
+
+Gateway.ProxyProtocol = 0
+
+#
+#    Cluster.RealmID
+#        Description: Realm this gateway fronts. Must match worldserver RealmID / realmlist.id.
+Cluster.RealmID = 1
+
+#
+#    Cluster.SharedToken
+#        Description: Must match worldserver Cluster.SharedToken.
+Cluster.SharedToken = ""
+
+#
+#    Cluster.StaleSeconds
+#        Description: Ignore cluster_node rows whose heartbeat is older than this.
+Cluster.StaleSeconds = 30
+
+#
+#    Cluster.AdminBindIP
+#        Description: Bind address for the cluster monitor HTTP API (dashboard).
+Cluster.AdminBindIP = "0.0.0.0"
+
+#
+#    Cluster.AdminPort
+#        Description: Admin HTTP port. 0 disables. Default 8090.
+Cluster.AdminPort = 8090
+
+#
+#    LoginDatabaseInfo
+LoginDatabaseInfo = "127.0.0.1;3306;skyfire;skyfire;auth"
+
+#
+#    CharacterDatabaseInfo
+#        Description: Optional. Enables GET /v1/players (online counts by map).
+CharacterDatabaseInfo = ""
+
+LoginDatabase.WorkerThreads = 1
+LoginDatabase.SynchThreads = 1
+MaxPingTime = 30
+PidFile = ""
+LogsDir = ""
+
+Appender.Console=1,2,0, 13 11 9 5 3 1
+Appender.Gateway=2,2,0,Gateway.log,w
+Logger.root=3,Console Gateway

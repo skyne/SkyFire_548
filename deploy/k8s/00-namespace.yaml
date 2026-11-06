@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skyfire
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyfire-cluster
+  namespace: skyfire
+data:
+  CLUSTER_TOKEN: skyfire-cluster
+  REALM_ID: "1"
+  AUTH_PORT: "3724"
+  WORLD_PORT: "8085"
+  LINK_PORT: "8086"

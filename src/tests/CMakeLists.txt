@@ -116,6 +116,25 @@ target_include_directories(login_identity_tests PRIVATE
 
 add_test(NAME login_identity_tests COMMAND login_identity_tests)
 
+add_executable(cluster_link_protocol_tests
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Cluster/ClusterLinkProtocol.cpp
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets/ByteBuffer.cpp
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Debugging/Errors.cpp
+  ClusterLinkProtocolTests.cpp
+)
+
+target_include_directories(cluster_link_protocol_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Cluster
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Debugging
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Packets
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Utilities
+)
+
+add_test(NAME cluster_link_protocol_tests COMMAND cluster_link_protocol_tests)
+
 add_executable(totp_tests
   ${CMAKE_SOURCE_DIR}/src/server/shared/Auth/TOTP.cpp
   ${CMAKE_SOURCE_DIR}/src/server/shared/Cryptography/CryptoRandom.cpp

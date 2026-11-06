@@ -513,7 +513,7 @@ void InstanceSaveManager::_ResetInstance(uint32 mapid, uint32 instanceId)
 {
     SF_LOG_DEBUG("maps", "InstanceSaveMgr::_ResetInstance %u, %u", mapid, instanceId);
     Map const* map = sMapMgr->CreateBaseMap(mapid);
-    if (!map->Instanceable())
+    if (!map || !map->Instanceable())
         return;
 
     InstanceSaveHashMap::iterator itr = m_instanceSaveById.find(instanceId);
@@ -607,6 +607,8 @@ void InstanceSaveManager::_ResetOrWarnAll(uint32 mapid, DifficultyID difficulty,
 
     // note: this isn't fast but it's meant to be executed very rarely
     Map const* map = sMapMgr->CreateBaseMap(mapid);          // _not_ include difficulty
+    if (!map || !map->Instanceable())
+        return;
     MapInstanced::InstancedMaps& instMaps = ((MapInstanced*)map)->GetInstancedMaps();
     MapInstanced::InstancedMaps::iterator mitr;
     uint32 timeLeft;

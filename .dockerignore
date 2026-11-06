@@ -1,0 +1,12 @@
+.git
+build
+build*
+env/dist
+var/sfdb
+sql/old
+*.o
+*.a
+Win32
+x64
+.idea
+.agents

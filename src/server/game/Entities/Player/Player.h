@@ -844,7 +844,8 @@ enum TeleportToOptions
     TELE_TO_NOT_LEAVE_TRANSPORT = 0x02,
     TELE_TO_NOT_LEAVE_COMBAT = 0x04,
     TELE_TO_NOT_UNSUMMON_PET = 0x08,
-    TELE_TO_SPELL = 0x10
+    TELE_TO_SPELL = 0x10,
+    TELE_TO_CLUSTER_FORCE = 0x20
 };
 
 /// Type of environmental damages
@@ -1319,6 +1320,8 @@ public:
 
     bool TeleportTo(uint32 mapid, float x, float y, float z, float orientation, uint32 options = 0);
     bool TeleportTo(WorldLocation const& loc, uint32 options = 0);
+    bool CanMigrateSafely() const;
+    bool RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options);
     bool TeleportToBGEntryPoint();
 
     void SetSummonPoint(uint32 mapid, float x, float y, float z);
@@ -3638,6 +3641,10 @@ private:
     uint32 m_teleport_options;
     bool mSemaphoreTeleport_Near;
     bool mSemaphoreTeleport_Far;
+    bool m_pendingClusterMigration;
+    uint32 m_clusterMigrationDeadline;
+    WorldLocation m_clusterMigrationDest;
+    uint32 m_clusterMigrationOptions;
 
     uint32 m_DelayedOperations;
     bool m_bCanDelayTeleport;

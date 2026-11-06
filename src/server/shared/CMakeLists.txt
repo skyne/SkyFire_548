@@ -19,6 +19,7 @@ file(GLOB_RECURSE sources_Packets Packets/*.cpp Packets/*.h)
 file(GLOB_RECURSE sources_Platform Platform/*.cpp Platform/*.h)
 file(GLOB_RECURSE sources_Threading Threading/*.cpp Threading/*.h)
 file(GLOB_RECURSE sources_Utilities Utilities/*.cpp Utilities/*.h)
+file(GLOB_RECURSE sources_Cluster Cluster/*.cpp Cluster/*.h)
 file(GLOB sources_localdir *.cpp *.h)
 
 source_group(CMake FILES CMakeLists.txt)
@@ -34,6 +35,7 @@ source_group(Packets FILES ${sources_Packets})
 source_group(Platform FILES ${sources_Platform})
 source_group(Threading FILES ${sources_Threading})
 source_group(Utilities FILES ${sources_Utilities})
+source_group(Cluster FILES ${sources_Cluster})
 source_group(localdir FILES ${sources_localdir})
 
 # Manually set sources for Debugging directory as we don't want to include WheatyExceptionReport in shared project
@@ -65,6 +67,7 @@ set(shared_STAT_SRCS
   ${sources_Platform}
   ${sources_Threading}
   ${sources_Utilities}
+  ${sources_Cluster}
   ${sources_localdir}
 )
 
@@ -89,6 +92,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Platform
   ${CMAKE_CURRENT_SOURCE_DIR}/Threading
   ${CMAKE_CURRENT_SOURCE_DIR}/Utilities
+  ${CMAKE_CURRENT_SOURCE_DIR}/Cluster
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/Object
   ${Boost_INCLUDE_DIRS}
   ${MYSQL_INCLUDE_DIR}

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SkyFire cluster</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #12151c;
+      --card: #1c2230;
+      --line: #2c3548;
+      --text: #e7ecf5;
+      --muted: #93a0b8;
+      --ok: #7ddea2;
+      --warn: #f0c674;
+      --accent: #8eb6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.45 ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 20px 28px 8px;
+    }
+    h1 { font-size: 20px; font-weight: 650; margin: 0; }
+    h2 { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+    .muted { color: var(--muted); }
+    main { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 16px; padding: 12px 28px 28px; }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .nodes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .node { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+    .node strong { display: block; font-size: 16px; }
+    .count { font-size: 28px; font-weight: 680; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 550; font-size: 12px; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .feed { grid-column: 1 / -1; }
+    code, pre { color: var(--accent); }
+    pre {
+      margin: 0;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font: 12px/1.4 ui-monospace, monospace;
+      color: var(--text);
+    }
+    select, button {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+    button {
+      cursor: pointer;
+      background: #2a3a5c;
+      color: var(--accent);
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .controls { display: grid; gap: 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .status { min-height: 1.4em; }
+    .loghead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .loghead h2 { margin: 0; }
+    @media (max-width: 900px) {
+      main, .nodes { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SkyFire cluster</h1>
+    <div class="muted" id="updated">waiting…</div>
+  </header>
+  <main>
+    <section>
+      <h2>World nodes</h2>
+      <div class="nodes" id="nodes"></div>
+    </section>
+    <section>
+      <h2>Map split / merge</h2>
+      <div class="controls">
+        <p class="muted">Moves whole map IDs only. Players on a moved map are kicked; they reconnect on the new owner.</p>
+        <div class="row">
+          <span>Split</span>
+          <select id="splitMap"></select>
+          <span class="muted">onto</span>
+          <select id="splitDest"></select>
+          <button id="splitBtn" type="button">Split map</button>
+        </div>
+        <div class="row">
+          <span>Merge</span>
+          <select id="mergeSource"></select>
+          <span class="muted">into</span>
+          <select id="mergeDest"></select>
+          <button id="mergeBtn" type="button">Merge node</button>
+        </div>
+        <div class="muted status" id="controlStatus"></div>
+      </div>
+    </section>
+    <section>
+      <h2>Account routes</h2>
+      <table>
+        <thead><tr><th>Account</th><th>GM</th><th>Map</th><th>Node</th></tr></thead>
+        <tbody id="routes"></tbody>
+      </table>
+    </section>
+    <section class="feed">
+      <h2>Changes while this page is open</h2>
+      <ul id="events"></ul>
+      <div class="loghead" style="margin-top:18px">
+        <h2>Server logs</h2>
+        <select id="logSource"></select>
+      </div>
+      <pre id="logs"></pre>
+    </section>
+  </main>
+  <script>
+    const nodesEl = document.getElementById("nodes");
+    const routesEl = document.getElementById("routes");
+    const eventsEl = document.getElementById("events");
+    const logsEl = document.getElementById("logs");
+    const logSourceEl = document.getElementById("logSource");
+    const updatedEl = document.getElementById("updated");
+    const splitMapEl = document.getElementById("splitMap");
+    const splitDestEl = document.getElementById("splitDest");
+    const mergeSourceEl = document.getElementById("mergeSource");
+    const mergeDestEl = document.getElementById("mergeDest");
+    const splitBtn = document.getElementById("splitBtn");
+    const mergeBtn = document.getElementById("mergeBtn");
+    const controlStatusEl = document.getElementById("controlStatus");
+    let selectedLog = localStorage.getItem("logSource") || "oldworld";
+    let controlKey = "";
+    let busy = false;
+
+    logSourceEl.addEventListener("change", () => {
+      selectedLog = logSourceEl.value;
+      localStorage.setItem("logSource", selectedLog);
+    });
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+    }
+
+    function fillSelect(el, options, keep) {
+      const current = keep || el.value;
+      el.innerHTML = options.map((opt) =>
+        `<option value="${esc(opt.value)}"${String(opt.value) === String(current) ? " selected" : ""}>${esc(opt.label)}</option>`
+      ).join("");
+    }
+
+    function syncControls(data) {
+      const maps = [];
+      for (const node of data.nodes)
+        for (const map of node.maps)
+          maps.push({
+            value: String(map.mapId),
+            label: `${map.mapName} (${map.mapId}) · ${node.name}`,
+          });
+      maps.sort((a, b) => Number(a.value) - Number(b.value));
+      const nodes = data.nodes.map((node) => ({
+        value: String(node.id),
+        label: `${node.name} (#${node.id})`,
+      }));
+      const key = JSON.stringify({ maps, nodes });
+      if (key === controlKey)
+        return;
+      controlKey = key;
+      fillSelect(splitMapEl, maps);
+      fillSelect(splitDestEl, nodes);
+      fillSelect(mergeSourceEl, nodes);
+      fillSelect(mergeDestEl, nodes);
+    }
+
+    async function postControl(path, payload) {
+      if (busy)
+        return;
+      busy = true;
+      splitBtn.disabled = true;
+      mergeBtn.disabled = true;
+      controlStatusEl.textContent = "working…";
+      try {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json();
+        if (!res.ok || body.error)
+          throw new Error(body.error || res.status);
+        controlStatusEl.textContent = body.op === "merge"
+          ? `Merged maps ${ (body.maps || []).join(", ") } onto node ${body.toNodeId}. Worlds apply within ~0.5s.`
+          : `Moved map ${body.mapId} to node ${body.toNodeId}. Worlds apply within ~0.5s.`;
+      } catch (err) {
+        controlStatusEl.textContent = err.message || String(err);
+      } finally {
+        busy = false;
+        splitBtn.disabled = false;
+        mergeBtn.disabled = false;
+      }
+    }
+
+    splitBtn.addEventListener("click", () => postControl("/api/maps/split", {
+      mapId: Number(splitMapEl.value),
+      destNodeId: Number(splitDestEl.value),
+    }));
+    mergeBtn.addEventListener("click", () => postControl("/api/maps/merge", {
+      sourceNodeId: Number(mergeSourceEl.value),
+      destNodeId: Number(mergeDestEl.value),
+    }));
+
+    function render(data) {
+      updatedEl.textContent = new Date(data.now).toLocaleTimeString();
+      syncControls(data);
+      nodesEl.innerHTML = data.nodes.map((node) => {
+        const maps = node.maps.map((map) => esc(map.mapName)).join(", ") || "no maps";
+        const players = node.players === null ? "?" : node.players;
+        const state = node.health === "ok" ? "ok" : "warn";
+        return `<article class="node">
+          <strong>${esc(node.name)}</strong>
+          <div class="count">${esc(players)}</div>
+          <div class="${state}">${esc(node.health)}${node.online ? "" : " · registry offline"}</div>
+          <div class="muted">${maps}</div>
+        </article>`;
+      }).join("") || `<p class="warn">${esc((data.errors || []).join("; ") || "no nodes")}</p>`;
+
+      routesEl.innerHTML = data.routes.map((route) => `<tr>
+        <td>${esc(route.username || route.accountId)}</td>
+        <td>${esc(route.gmLevel)}</td>
+        <td>${esc(route.mapName)} <span class="muted">(${esc(route.mapId)})</span></td>
+        <td><code>${esc(route.node || "unassigned")}</code></td>
+      </tr>`).join("") || `<tr><td colspan="4" class="muted">No route yet. First login follows the character map owner.</td></tr>`;
+
+      eventsEl.innerHTML = (data.events || []).map((event) =>
+        `<li><span class="muted">${esc(new Date(event.t).toLocaleTimeString())}</span> ${esc(event.text)}</li>`
+      ).join("") || `<li class="muted">Player counts and route changes show up here.</li>`;
+
+      const sources = data.logs || [];
+      const names = sources.map((source) => source.name);
+      if (!names.includes(selectedLog) && names.length)
+        selectedLog = names[0];
+      logSourceEl.innerHTML = names.map((name) =>
+        `<option value="${esc(name)}"${name === selectedLog ? " selected" : ""}>${esc(name)}</option>`
+      ).join("");
+      const source = sources.find((row) => row.name === selectedLog);
+      const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 48;
+      logsEl.textContent = source ? source.lines.join("\n") : "No log lines yet.";
+      if (atBottom)
+        logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/snapshot", { cache: "no-store" });
+        render(await res.json());
+      } catch (err) {
+        updatedEl.textContent = "dashboard request failed";
+      }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>

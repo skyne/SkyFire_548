@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authserver
+  namespace: skyfire
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authserver
+  template:
+    metadata:
+      labels:
+        app: authserver
+    spec:
+      containers:
+        - name: authserver
+          image: skyfire/548-authserver:local
+          ports:
+            - containerPort: 3724
+              name: grunt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authserver
+  namespace: skyfire
+spec:
+  type: LoadBalancer
+  selector:
+    app: authserver
+  ports:
+    - name: grunt
+      port: 3724
+      targetPort: 3724
+      protocol: TCP

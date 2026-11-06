@@ -442,7 +442,15 @@ Transport* TransportMgr::CreateTransport(uint32 entry, uint32 guid /*= 0*/, Map*
     }
 
     // use preset map for instances (need to know which instance)
-    trans->SetMap(map ? map : sMapMgr->CreateMap(mapId, NULL));
+    Map* destMap = map ? map : sMapMgr->CreateMap(mapId, NULL);
+    if (!destMap)
+    {
+        SF_LOG_DEBUG("entities.transport", "Transport %u skipped: map %u is not owned by this cluster node", entry, mapId);
+        delete trans;
+        return NULL;
+    }
+
+    trans->SetMap(destMap);
     if (map && map->IsInstance())
         trans->m_zoneScript = map->ToInstanceMap()->GetInstanceScript();
 

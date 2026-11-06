@@ -1,0 +1,285 @@
+# One StatefulSet per disjoint map-id pack. Never two owners of the same map.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: world-oldworld
+  namespace: skyfire
+spec:
+  serviceName: world-oldworld
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worldserver
+      role: oldworld
+  template:
+    metadata:
+      labels:
+        app: worldserver
+        role: oldworld
+    spec:
+      containers:
+        - name: worldserver
+          image: skyfire/548-worldserver:local
+          env:
+            - name: SF_CLUSTER_ENABLED
+              value: "1"
+            - name: SF_CLUSTER_NODE_ID
+              value: "1"
+            - name: SF_CLUSTER_AVAILABLE_MAPS
+              value: "0,1"
+            - name: SF_CLUSTER_HIDE_WORLD_PORT
+              value: "1"
+            - name: SF_CLUSTER_LINK_BIND_IP
+              value: "0.0.0.0"
+            - name: SF_CLUSTER_ADVERTISED_HOST
+              value: world-oldworld-0.world-oldworld
+            - name: SF_CLUSTER_SHARED_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: skyfire-cluster
+                  key: CLUSTER_TOKEN
+          ports:
+            - containerPort: 8086
+              name: clusterlink
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-oldworld
+  namespace: skyfire
+spec:
+  clusterIP: None
+  selector:
+    app: worldserver
+    role: oldworld
+  ports:
+    - name: clusterlink
+      port: 8086
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: world-outland
+  namespace: skyfire
+spec:
+  serviceName: world-outland
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worldserver
+      role: outland
+  template:
+    metadata:
+      labels:
+        app: worldserver
+        role: outland
+    spec:
+      containers:
+        - name: worldserver
+          image: skyfire/548-worldserver:local
+          env:
+            - name: SF_CLUSTER_ENABLED
+              value: "1"
+            - name: SF_CLUSTER_NODE_ID
+              value: "2"
+            - name: SF_CLUSTER_AVAILABLE_MAPS
+              value: "530"
+            - name: SF_CLUSTER_HIDE_WORLD_PORT
+              value: "1"
+            - name: SF_CLUSTER_LINK_BIND_IP
+              value: "0.0.0.0"
+            - name: SF_CLUSTER_ADVERTISED_HOST
+              value: world-outland-0.world-outland
+            - name: SF_CLUSTER_SHARED_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: skyfire-cluster
+                  key: CLUSTER_TOKEN
+          ports:
+            - containerPort: 8086
+              name: clusterlink
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-outland
+  namespace: skyfire
+spec:
+  clusterIP: None
+  selector:
+    app: worldserver
+    role: outland
+  ports:
+    - name: clusterlink
+      port: 8086
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: world-northrend
+  namespace: skyfire
+spec:
+  serviceName: world-northrend
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worldserver
+      role: northrend
+  template:
+    metadata:
+      labels:
+        app: worldserver
+        role: northrend
+    spec:
+      containers:
+        - name: worldserver
+          image: skyfire/548-worldserver:local
+          env:
+            - name: SF_CLUSTER_ENABLED
+              value: "1"
+            - name: SF_CLUSTER_NODE_ID
+              value: "3"
+            - name: SF_CLUSTER_AVAILABLE_MAPS
+              value: "571"
+            - name: SF_CLUSTER_HIDE_WORLD_PORT
+              value: "1"
+            - name: SF_CLUSTER_LINK_BIND_IP
+              value: "0.0.0.0"
+            - name: SF_CLUSTER_ADVERTISED_HOST
+              value: world-northrend-0.world-northrend
+            - name: SF_CLUSTER_SHARED_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: skyfire-cluster
+                  key: CLUSTER_TOKEN
+          ports:
+            - containerPort: 8086
+              name: clusterlink
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-northrend
+  namespace: skyfire
+spec:
+  clusterIP: None
+  selector:
+    app: worldserver
+    role: northrend
+  ports:
+    - name: clusterlink
+      port: 8086
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: world-pandaria
+  namespace: skyfire
+spec:
+  serviceName: world-pandaria
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worldserver
+      role: pandaria
+  template:
+    metadata:
+      labels:
+        app: worldserver
+        role: pandaria
+    spec:
+      containers:
+        - name: worldserver
+          image: skyfire/548-worldserver:local
+          env:
+            - name: SF_CLUSTER_ENABLED
+              value: "1"
+            - name: SF_CLUSTER_NODE_ID
+              value: "4"
+            - name: SF_CLUSTER_AVAILABLE_MAPS
+              value: "860,870"
+            - name: SF_CLUSTER_HIDE_WORLD_PORT
+              value: "1"
+            - name: SF_CLUSTER_LINK_BIND_IP
+              value: "0.0.0.0"
+            - name: SF_CLUSTER_ADVERTISED_HOST
+              value: world-pandaria-0.world-pandaria
+            - name: SF_CLUSTER_SHARED_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: skyfire-cluster
+                  key: CLUSTER_TOKEN
+          ports:
+            - containerPort: 8086
+              name: clusterlink
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-pandaria
+  namespace: skyfire
+spec:
+  clusterIP: None
+  selector:
+    app: worldserver
+    role: pandaria
+  ports:
+    - name: clusterlink
+      port: 8086
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: world-bg
+  namespace: skyfire
+spec:
+  serviceName: world-bg
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worldserver
+      role: bg
+  template:
+    metadata:
+      labels:
+        app: worldserver
+        role: bg
+    spec:
+      containers:
+        - name: worldserver
+          image: skyfire/548-worldserver:local
+          env:
+            - name: SF_CLUSTER_ENABLED
+              value: "1"
+            - name: SF_CLUSTER_NODE_ID
+              value: "5"
+            - name: SF_CLUSTER_AVAILABLE_MAPS
+              value: "30,489,529,566,607,628,726,727,761,998,1105"
+            - name: SF_CLUSTER_HIDE_WORLD_PORT
+              value: "1"
+            - name: SF_CLUSTER_LINK_BIND_IP
+              value: "0.0.0.0"
+            - name: SF_CLUSTER_ADVERTISED_HOST
+              value: world-bg-0.world-bg
+            - name: SF_CLUSTER_SHARED_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: skyfire-cluster
+                  key: CLUSTER_TOKEN
+          ports:
+            - containerPort: 8086
+              name: clusterlink
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-bg
+  namespace: skyfire
+spec:
+  clusterIP: None
+  selector:
+    app: worldserver
+    role: bg
+  ports:
+    - name: clusterlink
+      port: 8086

@@ -26,6 +26,8 @@
 #include "WorldRunnable.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
+#include "ClusterLinkServer.h"
+#include "ClusterMgr.h"
 
 #include "AuthSocket.h"
 #include "CliRunnable.h"
@@ -532,12 +534,27 @@ int Master::Run()
     uint16 worldPort = uint16(sWorld->getIntConfig(WorldIntConfigs::CONFIG_PORT_WORLD));
     std::string bindIp = sConfigMgr->GetStringDefault("BindIP", "0.0.0.0");
 
-    if (sWorldSocketMgr->StartNetwork(worldPort, bindIp.c_str()) == -1)
+    if (sClusterMgr->IsEnabled())
     {
-        SF_LOG_ERROR("server.worldserver", "Failed to start network");
-        World::StopNow(ERROR_EXIT_CODE);
-        // go down and shutdown the server
+        if (!sClusterLinkServer->Start(uint16(sClusterMgr->GetLinkPort()), sClusterMgr->GetLinkBindIP()))
+        {
+            SF_LOG_ERROR("server.worldserver", "Failed to start ClusterLink on %s:%u",
+                sClusterMgr->GetLinkBindIP().c_str(), sClusterMgr->GetLinkPort());
+            World::StopNow(ERROR_EXIT_CODE);
+        }
     }
+
+    if (!sClusterMgr->IsEnabled() || !sClusterMgr->HideWorldPort())
+    {
+        if (sWorldSocketMgr->StartNetwork(worldPort, bindIp.c_str()) == -1)
+        {
+            SF_LOG_ERROR("server.worldserver", "Failed to start network");
+            World::StopNow(ERROR_EXIT_CODE);
+            // go down and shutdown the server
+        }
+    }
+    else
+        SF_LOG_INFO("server.worldserver", "Cluster.HideWorldPort=1: public WorldServerPort is not bound; clients must use clustergateway.");
 
     // set server online (allow connecting now)
     for (std::map<uint32, std::string>::const_iterator itr = realmNameStore.begin(); itr != realmNameStore.end(); ++itr)
@@ -556,6 +573,9 @@ int Master::Run()
     freezeDetectorRunner.Join();
 
     soapService.Join();
+
+    sClusterLinkServer->Stop();
+    sClusterMgr->Shutdown();
 
     // set server offline
     for (std::map<uint32, std::string>::const_iterator itr = realmNameStore.begin(); itr != realmNameStore.end(); ++itr)
@@ -769,8 +789,17 @@ bool Master::_StartDB()
     }
 
     // Load realm names into a store
-    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_REALMLIST);
-    stmt->setInt32(0, sConfigMgr->GetIntDefault("WorldServerPort", 8085));
+    PreparedStatement* stmt = NULL;
+    if (sConfigMgr->GetBoolDefault("Cluster.Enabled", false) && sConfigMgr->GetIntDefault("RealmID", 0) > 0)
+    {
+        stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_REALMLIST_BY_ID);
+        stmt->setUInt32(0, uint32(sConfigMgr->GetIntDefault("RealmID", 0)));
+    }
+    else
+    {
+        stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_REALMLIST);
+        stmt->setInt32(0, sConfigMgr->GetIntDefault("WorldServerPort", 8085));
+    }
     PreparedQueryResult result = LoginDatabase.Query(stmt);
     if (result)
     {

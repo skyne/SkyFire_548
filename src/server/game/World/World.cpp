@@ -21,6 +21,7 @@
 #include "CellImpl.h"
 #include "Channel.h"
 #include "CharacterDatabaseCleaner.h"
+#include "ClusterMgr.h"
 #include "Chat.h"
 #include "CinematicPathMgr.h"
 #include "Common.h"
@@ -664,6 +665,7 @@ void World::LoadConfigSettings(bool reload)
     setIntConfig(WorldIntConfigs::CONFIG_SESSION_ADD_DELAY, sConfigMgr->GetIntDefault("SessionAddDelay", 10000));
     SetBoolConfig(WorldBoolConfigs::CONFIG_AUTHNET_WORLD_TOKEN_RESOLVE, sConfigMgr->GetBoolDefault("Authnet.WorldTokenResolve", false));
     SetBoolConfig(WorldBoolConfigs::CONFIG_AUTHNET_VERBOSE_LOGGING, sConfigMgr->GetBoolDefault("Authnet.VerboseLogging", false));
+    sClusterMgr->LoadConfig();
 
     SetFloatConfig(WorldFloatConfigs::CONFIG_GROUP_XP_DISTANCE, sConfigMgr->GetFloatDefault("MaxGroupXPDistance", 74.0f));
     SetFloatConfig(WorldFloatConfigs::CONFIG_MAX_RECRUIT_A_FRIEND_DISTANCE, sConfigMgr->GetFloatDefault("MaxRecruitAFriendBonusDistance", 100.0f));
@@ -1402,6 +1404,12 @@ void World::SetInitialWorldSettings()
         sLog->SetRealmId(realmID);
     }
 
+    if (!sClusterMgr->Initialize())
+    {
+        SF_LOG_ERROR("server.loading", "Cluster registry initialization failed.");
+        exit(1);
+    }
+
     ///- Initialize Allowed Security Level
     LoadDBAllowedSecurityLevel();
 
@@ -1409,19 +1417,23 @@ void World::SetInitialWorldSettings()
     sObjectMgr->SetHighestGuids();
 
     ///- Check the existence of the map files for all races' startup areas.
-    if (!MapManager::ExistMapAndVMap(0, -6240.32f, 331.033f)
-        || !MapManager::ExistMapAndVMap(0, -8949.95f, -132.493f)
-        || !MapManager::ExistMapAndVMap(1, -618.518f, -4251.67f)
-        || !MapManager::ExistMapAndVMap(0, 1676.35f, 1677.45f)
-        || !MapManager::ExistMapAndVMap(1, 10311.3f, 832.463f)
-        || !MapManager::ExistMapAndVMap(1, -2917.58f, -257.98f)
+    auto requireOwnedMap = [](uint32 mapId, float x, float y) -> bool
+    {
+        return !sClusterMgr->OwnsMap(mapId) || MapManager::ExistMapAndVMap(mapId, x, y);
+    };
+    if (!requireOwnedMap(0, -6240.32f, 331.033f)
+        || !requireOwnedMap(0, -8949.95f, -132.493f)
+        || !requireOwnedMap(1, -618.518f, -4251.67f)
+        || !requireOwnedMap(0, 1676.35f, 1677.45f)
+        || !requireOwnedMap(1, 10311.3f, 832.463f)
+        || !requireOwnedMap(1, -2917.58f, -257.98f)
         || (getIntConfig(WorldIntConfigs::CONFIG_EXPANSION) > 0 && (
-            !MapManager::ExistMapAndVMap(530, 10349.6f, -6357.29f)
-            || !MapManager::ExistMapAndVMap(530, -3961.64f, -13931.2f)
-            || !MapManager::ExistMapAndVMap(648, -8423.81f, 1361.3f)
-            || !MapManager::ExistMapAndVMap(654, -1451.53f, 1403.35f)
-            || !MapManager::ExistMapAndVMap(609, 2356.21f, -5662.21f)
-            || !MapManager::ExistMapAndVMap(860, 1471.67f, 3466.25f))))
+            !requireOwnedMap(530, 10349.6f, -6357.29f)
+            || !requireOwnedMap(530, -3961.64f, -13931.2f)
+            || !requireOwnedMap(648, -8423.81f, 1361.3f)
+            || !requireOwnedMap(654, -1451.53f, 1403.35f)
+            || !requireOwnedMap(609, 2356.21f, -5662.21f)
+            || !requireOwnedMap(860, 1471.67f, 3466.25f))))
     {
         SF_LOG_ERROR("server.loading", "Correct *.map files not found in path '%smaps' or *.vmtree/*.vmtile files in '%svmaps'. Please place *.map/*.vmtree/*.vmtile files in appropriate directories or correct the DataDir value in the worldserver.conf file.", m_dataPath.c_str(), m_dataPath.c_str());
         exit(1);
@@ -2136,6 +2148,7 @@ void World::Update(uint32 diff)
 
     ///- Update the game time and check for shutdown time
     _UpdateGameTime();
+    sClusterMgr->Update(diff);
 
     /// Handle daily quests reset time
     if (m_gameTime > m_NextDailyQuestReset)

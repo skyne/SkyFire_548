@@ -10,6 +10,8 @@
 #include "CalendarMgr.h"
 #include "CharacterBoost.h"
 #include "Chat.h"
+#include "ClusterLinkSession.h"
+#include "ClusterMgr.h"
 #include "Common.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
@@ -1450,6 +1452,41 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPacket& recvData)
         return;
     }
 
+    if (sClusterMgr->IsEnabled() && GetClusterLink() && !sClusterMgr->OwnsAllMaps())
+    {
+        PreparedStatement* loc = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHAR_POSITION);
+        loc->setUInt32(0, GUID_LOPART(playerGuid));
+        if (PreparedQueryResult pos = CharacterDatabase.Query(loc))
+        {
+            Field* fields = pos->Fetch();
+            float x = fields[0].GetFloat();
+            float y = fields[1].GetFloat();
+            float z = fields[2].GetFloat();
+            float o = fields[3].GetFloat();
+            uint32 mapId = fields[4].GetUInt32();
+            if (!sClusterMgr->OwnsMap(mapId))
+            {
+                Skyfire::Cluster::HandoffPayload payload;
+                payload.AccountId = GetAccountId();
+                payload.CharacterGuid = GUID_LOPART(playerGuid);
+                payload.DestMap = mapId;
+                payload.X = x;
+                payload.Y = y;
+                payload.Z = z;
+                payload.O = o;
+                payload.Flags = Skyfire::Cluster::HANDOFF_FLAG_LOGIN;
+                sClusterMgr->UpdateAccountRoute(GetAccountId(), payload.CharacterGuid, mapId);
+                GetClusterLink()->SendHandoff(payload);
+                SF_LOG_INFO("maps", "Account %u character %u login handed off to map %u owner.",
+                    GetAccountId(), payload.CharacterGuid, mapId);
+                FinishClusterHandoff();
+                m_playerLoading = false;
+                m_pendingPlayerLoginGuid = 0;
+                return;
+            }
+        }
+    }
+
     ContinuePlayerLogin();
 }
 
@@ -1471,6 +1508,75 @@ void WorldSession::ContinuePlayerLogin()
 
     m_pendingPlayerLoginGuid = 0;
     _charLoginCallback = CharacterDatabase.DelayQueryHolder((SQLQueryHolder*)holder);
+}
+
+void WorldSession::StartClusterLogin(uint32 characterGuid)
+{
+    m_playerLoading = true;
+    m_pendingPlayerLoginGuid = MAKE_NEW_GUID(characterGuid, 0, HIGHGUID_PLAYER);
+    _legitCharacters.insert(characterGuid);
+    ContinuePlayerLogin();
+}
+
+void WorldSession::StartClusterResume(uint32 characterGuid, uint32 mapId, float x, float y, float z, float o, uint32 options)
+{
+    m_clusterResumePending = true;
+    m_clusterResumeGuid = characterGuid;
+    m_clusterResumeMap = mapId;
+    m_clusterResumeX = x;
+    m_clusterResumeY = y;
+    m_clusterResumeZ = z;
+    m_clusterResumeO = o;
+    m_clusterResumeOptions = options;
+    m_playerLoading = true;
+    _legitCharacters.insert(characterGuid);
+
+    LoginQueryHolder* holder = new LoginQueryHolder(GetAccountId(), MAKE_NEW_GUID(characterGuid, 0, HIGHGUID_PLAYER));
+    if (!holder->Initialize())
+    {
+        delete holder;
+        m_playerLoading = false;
+        m_clusterResumePending = false;
+        return;
+    }
+    _charLoginCallback = CharacterDatabase.DelayQueryHolder((SQLQueryHolder*)holder);
+}
+
+void WorldSession::HandleClusterResumeLogin(LoginQueryHolder* holder)
+{
+    m_clusterResumePending = false;
+    uint64 playerGuid = holder->GetGuid();
+    Player* player = new Player(this);
+    if (!player->LoadFromDB(GUID_LOPART(playerGuid), holder))
+    {
+        SetPlayer(NULL);
+        delete player;
+        delete holder;
+        m_playerLoading = false;
+        KickPlayer();
+        return;
+    }
+
+    player->GetMotionMaster()->Initialize();
+    player->Relocate(m_clusterResumeX, m_clusterResumeY, m_clusterResumeZ, m_clusterResumeO);
+    player->m_teleport_dest = WorldLocation(m_clusterResumeMap, m_clusterResumeX, m_clusterResumeY,
+        m_clusterResumeZ, m_clusterResumeO);
+    player->m_teleport_options = m_clusterResumeOptions;
+    player->SetSemaphoreTeleportFar(true);
+    player->SetFallInformation(0, m_clusterResumeZ);
+    sObjectAccessor->AddObject(player);
+
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_ONLINE);
+    stmt->setUInt32(0, player->GetGUIDLow());
+    CharacterDatabase.Execute(stmt);
+    stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_ACCOUNT_ONLINE);
+    stmt->setUInt32(0, GetAccountId());
+    LoginDatabase.Execute(stmt);
+
+    delete holder;
+    m_playerLoading = false;
+    SF_LOG_INFO("maps", "Cluster resume loaded %s (guid %u) waiting worldport ack for map %u.",
+        player->GetName().c_str(), player->GetGUIDLow(), m_clusterResumeMap);
 }
 
 void WorldSession::HandleQueuedMessagesEnd(WorldPacket& /*recvData*/)

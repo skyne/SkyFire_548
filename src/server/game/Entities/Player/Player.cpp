@@ -18,6 +18,8 @@
 #include "ChannelMgr.h"
 #include "CharacterDatabaseCleaner.h"
 #include "Chat.h"
+#include "ClusterLinkSession.h"
+#include "ClusterMgr.h"
 #include "Common.h"
 #include "ConditionMgr.h"
 #include "CreatureAI.h"
@@ -42,6 +44,7 @@
 #include "Log.h"
 #include "MapInstanced.h"
 #include "MapManager.h"
+#include "MotionMaster.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
@@ -587,6 +590,9 @@ Player::Player(WorldSession* session) : Unit(true)
 
     mSemaphoreTeleport_Near = false;
     mSemaphoreTeleport_Far = false;
+    m_pendingClusterMigration = false;
+    m_clusterMigrationDeadline = 0;
+    m_clusterMigrationOptions = 0;
 
     m_DelayedOperations = 0;
     m_bCanDelayTeleport = false;
@@ -1399,6 +1405,20 @@ void Player::SetDrunkValue(uint8 newDrunkValue, uint32 itemId /*= 0*/)
 
 void Player::Update(uint32 p_time)
 {
+    if (m_pendingClusterMigration && IsInWorld())
+    {
+        bool force = getMSTime() >= m_clusterMigrationDeadline;
+        if (force || CanMigrateSafely())
+        {
+            uint32 options = m_clusterMigrationOptions | (force ? uint32(TELE_TO_CLUSTER_FORCE) : 0);
+            WorldLocation dest = m_clusterMigrationDest;
+            m_pendingClusterMigration = false;
+            RequestClusterHandoff(dest.GetMapId(), dest.GetPositionX(), dest.GetPositionY(),
+                dest.GetPositionZ(), dest.GetOrientation(), options);
+            return;
+        }
+    }
+
     if (!IsInWorld())
         return;
 
@@ -2105,6 +2125,84 @@ uint8 Player::GetChatTag() const
     return tag;
 }
 
+bool Player::CanMigrateSafely() const
+{
+    if (IsInFlight() || GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+        return true;
+
+    if (IsInCombat())
+        return false;
+    if (IsNonMeleeSpellCasted(true))
+        return false;
+    if (GetVehicle())
+        return false;
+
+    uint32 flags = GetUnitMovementFlags();
+    if (flags & (MOVEMENTFLAG_FALLING | MOVEMENTFLAG_FALLING_FAR))
+        return false;
+
+    return true;
+}
+
+bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options)
+{
+    if (!sClusterMgr->IsEnabled() || sClusterMgr->OwnsMap(mapid))
+        return false;
+    if (!GetSession() || !GetSession()->GetClusterLink())
+        return false;
+
+    bool force = (options & TELE_TO_CLUSTER_FORCE) != 0;
+    if (!force && !CanMigrateSafely())
+    {
+        m_pendingClusterMigration = true;
+        m_clusterMigrationDest = WorldLocation(mapid, x, y, z, orientation);
+        m_clusterMigrationOptions = options;
+        m_clusterMigrationDeadline = getMSTime() + sClusterMgr->GetMigrationTimeoutMs();
+        SF_LOG_INFO("maps", "Player %s deferred cluster handoff to map %u until safe (timeout %u ms).",
+            GetName().c_str(), mapid, sClusterMgr->GetMigrationTimeoutMs());
+        return true;
+    }
+
+    if (m_vehicle)
+        ExitVehicle();
+    CombatStop();
+    if (IsNonMeleeSpellCasted(true))
+        InterruptNonMeleeSpells(true);
+
+    if (Pet* pet = GetPet())
+        UnsummonPetTemporaryIfAny();
+    GetBattlePetMgr()->UnSummonCurrentBattlePet(true);
+
+    m_teleport_dest = WorldLocation(mapid, x, y, z, orientation);
+    m_teleport_options = options;
+    Relocate(x, y, z, orientation);
+    SetFallInformation(0, z);
+    SaveToDB();
+    sClusterMgr->UpdateAccountRoute(GetSession()->GetAccountId(), GetGUIDLow(), mapid);
+
+    Skyfire::Cluster::HandoffPayload payload;
+    payload.AccountId = GetSession()->GetAccountId();
+    payload.CharacterGuid = GetGUIDLow();
+    payload.DestMap = mapid;
+    payload.X = x;
+    payload.Y = y;
+    payload.Z = z;
+    payload.O = orientation;
+    payload.Options = options;
+    if (IsInFlight() || GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+        payload.Flags = Skyfire::Cluster::HANDOFF_FLAG_TAXI;
+    if (force)
+        payload.Flags |= Skyfire::Cluster::HANDOFF_FLAG_FORCE;
+
+    ClusterLinkSession* link = GetSession()->GetClusterLink();
+    link->SendHandoff(payload);
+    SF_LOG_INFO("maps", "Player %s handing off to map %u on another cluster node.", GetName().c_str(), mapid);
+    if (IsInWorld())
+        GetMap()->RemovePlayerFromMap(this, false);
+    GetSession()->FinishClusterHandoff();
+    return true;
+}
+
 bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientation, uint32 options)
 {
     if (!MapManager::IsValidMapCoord(mapid, x, y, z, orientation))
@@ -2244,6 +2342,9 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         // far teleport to another map
         Map* oldmap = IsInWorld() ? GetMap() : NULL;
         // check if we can enter before stopping combat / removing pet / totems / interrupting spells
+
+        if (sClusterMgr->IsEnabled() && !sClusterMgr->OwnsMap(mapid))
+            return RequestClusterHandoff(mapid, x, y, z, orientation, options);
 
         // Check enter rights before map getting to avoid creating instance copy for player
         // this check not dependent from map instance copy and same for all instance copies of selected map
@@ -12734,6 +12835,12 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder* holder)
 
     // NOW player must have valid map
     // load the player's map here if it's not already loaded
+    if (sClusterMgr->IsEnabled() && !sClusterMgr->OwnsMap(mapId))
+    {
+        SF_LOG_ERROR("entities.player", "Player (guidlow %d) loaded on a node that does not own map %u; login should have handed off.", guid, mapId);
+        return false;
+    }
+
     Map* map = sMapMgr->CreateMap(mapId, this);
 
     if (!map)

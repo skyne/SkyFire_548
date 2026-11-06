@@ -31,7 +31,7 @@ public:
     uint16 GetAreaFlag(uint32 mapid, float x, float y, float z) const
     {
         Map const* m = const_cast<MapManager*>(this)->CreateBaseMap(mapid);
-        return m->GetAreaFlag(x, y, z);
+        return m ? m->GetAreaFlag(x, y, z) : 0;
     }
     uint32 GetAreaId(uint32 mapid, float x, float y, float z) const
     {
@@ -68,6 +68,7 @@ public:
 
     //void LoadGrid(int mapid, int instId, float x, float y, const WorldObject* obj, bool no_unload = false);
     void UnloadAll();
+    void KickPlayersOnUnownedMaps();
 
     static bool ExistMapAndVMap(uint32 mapid, float x, float y);
     static bool IsValidMAP(uint32 mapid, bool startUp);
