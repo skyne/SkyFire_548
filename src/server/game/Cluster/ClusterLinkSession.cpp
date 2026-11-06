@@ -37,6 +37,17 @@ void ClusterLinkSession::Start()
 
 void ClusterLinkSession::Close()
 {
+    // Keep the session alive for the whole close. Callers such as WorldSession
+    // hold only a shared_ptr and drop it while this function is still using the socket.
+    std::shared_ptr<ClusterLinkSession> keepAlive;
+    try
+    {
+        keepAlive = shared_from_this();
+    }
+    catch (std::bad_weak_ptr const&)
+    {
+    }
+
     if (_closed.exchange(true))
         return;
 
@@ -44,7 +55,7 @@ void ClusterLinkSession::Close()
         std::lock_guard<std::mutex> guard(_sessionLock);
         if (_session)
         {
-            _session->SetClusterLink(NULL);
+            _session->SetClusterLink(std::shared_ptr<ClusterLinkSession>());
             _session = NULL;
         }
     }
@@ -213,7 +224,7 @@ void ClusterLinkSession::HandleAttach(ByteBuffer& payload)
         LocaleConstant(locale), recruiter, false, hasBoost != 0, usedEmailLogin != 0, false, accountName, sessionKey);
     session->SetRemoteAddress(clientIp);
     session->SetVirtualRealmID(virtualRealmId);
-    session->SetClusterLink(this);
+    session->SetClusterLink(shared_from_this());
     session->LoadGlobalAccountData();
     session->LoadTutorialsData();
     session->LoadPermissions();
@@ -269,7 +280,7 @@ void ClusterLinkSession::HandleResume(ByteBuffer& payload)
         LocaleConstant(locale), recruiter, false, hasBoost != 0, usedEmailLogin != 0, false, accountName, sessionKey);
     session->SetRemoteAddress(clientIp);
     session->SetVirtualRealmID(virtualRealmId);
-    session->SetClusterLink(this);
+    session->SetClusterLink(shared_from_this());
     session->LoadGlobalAccountData();
     session->LoadTutorialsData();
     session->LoadPermissions();

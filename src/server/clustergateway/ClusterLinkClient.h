@@ -9,12 +9,14 @@
 #include "Authentication/AuthDefines.h"
 #include "Cluster/ClusterLinkProtocol.h"
 #include "Network/BoostAsioWriteQueue.h"
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <array>
 #include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 class ClusterLinkClient : public std::enable_shared_from_this<ClusterLinkClient>
@@ -24,7 +26,7 @@ public:
     typedef std::function<void(Skyfire::Cluster::HandoffPayload const&)> HandoffHandler;
     typedef std::function<void()> CloseHandler;
 
-    ClusterLinkClient(boost::asio::io_context& ioContext);
+    ClusterLinkClient();
     ~ClusterLinkClient();
 
     bool Connect(std::string const& host, uint16 port);
@@ -53,7 +55,9 @@ private:
     void QueueFrame(Skyfire::Cluster::LinkMessage type, ByteBuffer const& payload);
     bool WaitMessage(Skyfire::Cluster::LinkMessage expected, ByteBuffer& payload);
 
-    boost::asio::io_context& _ioContext;
+    // Own io_context so the blocking handshake never runs on the client socket's thread.
+    boost::asio::io_context _ioContext;
+    std::thread _thread;
     std::unique_ptr<boost::asio::ip::tcp::socket> _socket;
     std::unique_ptr<Skyfire::Net::BoostAsioWriteQueue<boost::asio::ip::tcp::socket>> _writeQueue;
     std::array<char, 4096> _readBuffer;

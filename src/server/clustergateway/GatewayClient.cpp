@@ -494,21 +494,25 @@ bool GatewayClient::LookupWorld(uint32 accountId, uint32 mapId, std::string& hos
 {
     uint32 realmId = uint32(sConfigMgr->GetIntDefault("Cluster.RealmID", 1));
     uint32 stale = uint32(sConfigMgr->GetIntDefault("Cluster.StaleSeconds", 30));
-    uint32 nodeId = 0;
     uint32 routedMap = mapId;
 
-    if (!routedMap)
+    // mapId 0 is char-select ("unknown"), not Eastern Kingdoms. A handoff passes the destination.
+    PreparedStatement* route = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_ACCOUNT_ROUTE_LATEST);
+    route->setUInt32(0, accountId);
+    route->setUInt32(1, realmId);
+    if (PreparedQueryResult routed = LoginDatabase.Query(route))
     {
-        PreparedStatement* route = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_ACCOUNT_ROUTE_LATEST);
-        route->setUInt32(0, accountId);
-        route->setUInt32(1, realmId);
-        if (PreparedQueryResult routed = LoginDatabase.Query(route))
+        Field* fields = routed->Fetch();
+        uint32 routeMap = fields[0].GetUInt32();
+        uint32 routeNode = fields[1].GetUInt32();
+        bool useRoute = !mapId || routeMap == mapId;
+        if (!mapId)
+            routedMap = routeMap;
+        if (useRoute && routeNode)
         {
-            routedMap = routed->Fetch()[0].GetUInt32();
-            nodeId = routed->Fetch()[1].GetUInt32();
             PreparedStatement* node = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_NODE_ENDPOINT);
             node->setUInt32(0, realmId);
-            node->setUInt32(1, nodeId);
+            node->setUInt32(1, routeNode);
             node->setUInt32(2, stale);
             if (PreparedQueryResult endpoint = LoginDatabase.Query(node))
             {
@@ -594,7 +598,7 @@ void GatewayClient::BindWorldHandlers()
 bool GatewayClient::ConnectWorld(std::string const& host, uint16 port, Skyfire::Cluster::HandoffPayload const* resume)
 {
     uint32 realmId = uint32(sConfigMgr->GetIntDefault("Cluster.RealmID", 1));
-    _worldLink.reset(new ClusterLinkClient(_ioContext));
+    _worldLink.reset(new ClusterLinkClient());
     if (!_worldLink->Connect(host, port))
         return false;
 

@@ -1321,7 +1321,8 @@ public:
     bool TeleportTo(uint32 mapid, float x, float y, float z, float orientation, uint32 options = 0);
     bool TeleportTo(WorldLocation const& loc, uint32 options = 0);
     bool CanMigrateSafely() const;
-    bool RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options);
+    bool RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options, uint32 routedNode = 0);
+    static void NotePartyDesiredLayer(uint32 characterGuid, uint32 mapId, uint32 nodeId);
     bool TeleportToBGEntryPoint();
 
     void SetSummonPoint(uint32 mapid, float x, float y, float z);

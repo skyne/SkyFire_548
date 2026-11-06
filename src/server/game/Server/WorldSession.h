@@ -14,6 +14,7 @@
 #include "Authentication/AuthDefines.h"
 #include "AddonMgr.h"
 #include <atomic>
+#include <memory>
 #include "Common.h"
 #include "DatabaseEnv.h"
 #include "Object.h"
@@ -265,8 +266,8 @@ public:
     bool PlayerRecentlyLoggedOut() const { return m_playerRecentlyLogout; }
     bool PlayerDisconnected() const { return !m_Socket && !m_clusterLink; }
     bool HasActiveClient() const;
-    void SetClusterLink(ClusterLinkSession* link);
-    ClusterLinkSession* GetClusterLink() const { return m_clusterLink; }
+    void SetClusterLink(std::shared_ptr<ClusterLinkSession> link);
+    std::shared_ptr<ClusterLinkSession> GetClusterLink() const { return m_clusterLink; }
     void FinishClusterHandoff();
     void StartClusterResume(uint32 characterGuid, uint32 mapId, float x, float y, float z, float o, uint32 options);
     void StartClusterLogin(uint32 characterGuid);
@@ -1266,7 +1267,7 @@ private:
     Player* _player;
     WorldSocket* m_Socket;
     WorldSocket* m_InstanceSocket;
-    ClusterLinkSession* m_clusterLink;
+    std::shared_ptr<ClusterLinkSession> m_clusterLink;
     bool m_clusterHandedOff;
     bool m_clusterResumePending;
     uint32 m_clusterResumeGuid;

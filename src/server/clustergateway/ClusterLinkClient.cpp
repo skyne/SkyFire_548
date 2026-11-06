@@ -11,8 +11,9 @@
 #include <boost/asio/write.hpp>
 #include <cstring>
 
-ClusterLinkClient::ClusterLinkClient(boost::asio::io_context& ioContext) :
-    _ioContext(ioContext),
+ClusterLinkClient::ClusterLinkClient() :
+    _ioContext(),
+    _thread(),
     _closed(false)
 {
 }
@@ -20,6 +21,9 @@ ClusterLinkClient::ClusterLinkClient(boost::asio::io_context& ioContext) :
 ClusterLinkClient::~ClusterLinkClient()
 {
     Close();
+    _ioContext.stop();
+    if (_thread.joinable() && _thread.get_id() != std::this_thread::get_id())
+        _thread.join();
 }
 
 bool ClusterLinkClient::Connect(std::string const& host, uint16 port)
@@ -179,6 +183,13 @@ void ClusterLinkClient::StartRead()
 {
     ProcessPending();
     AsyncRead();
+    if (_thread.joinable())
+        return;
+
+    _thread = std::thread([this]()
+    {
+        _ioContext.run();
+    });
 }
 
 void ClusterLinkClient::AsyncRead()

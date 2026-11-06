@@ -32,10 +32,14 @@ public:
     bool OwnsMap(uint32 mapId) const;
     bool OwnsAllMaps() const { return _ownsAllMaps; }
     uint32 GetMigrationTimeoutMs() const { return _migrationTimeoutMs; }
+    uint32 GetLayerSoftCap() const { return _layerSoftCap; }
+    uint32 GetLayerHardCap() const { return _layerHardCap; }
 
     bool LookupMapOwner(uint32 mapId, uint32& nodeId, std::string& host, uint16& port) const;
     bool LookupAccountRoute(uint32 accountId, uint32 characterGuid, uint32& mapId, uint32& nodeId) const;
     void UpdateAccountRoute(uint32 accountId, uint32 characterGuid, uint32 mapId);
+    void UpdateAccountRoute(uint32 accountId, uint32 characterGuid, uint32 mapId, uint32 nodeId);
+    void NoteDesiredLayer(uint32 characterGuid, uint32 mapId, uint32 nodeId);
 
 private:
     ClusterMgr();
@@ -45,6 +49,8 @@ private:
     bool RegisterNode();
     bool ClaimMaps();
     void Heartbeat();
+    void UpdateLayerPopulation();
+    void DrainDesiredLayers();
     void MarkDown();
     void ReconcileMaps();
 
@@ -56,6 +62,8 @@ private:
     uint32 _heartbeatInterval;
     uint32 _staleSeconds;
     uint32 _migrationTimeoutMs;
+    uint32 _layerSoftCap;
+    uint32 _layerHardCap;
     int32 _heartbeatTimer;
     int32 _reconcileTimer;
     std::string _linkBindIP;

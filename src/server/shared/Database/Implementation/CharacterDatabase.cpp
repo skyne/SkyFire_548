@@ -671,5 +671,11 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     PrepareStatement(CHAR_DEL_BLACKMARKET_AUCTION, "DELETE FROM blackmarket_auctions WHERE auctionId = ?", CONNECTION_ASYNC);
     PrepareStatement(CHAR_INS_BLACKMARKET_AUCTION, "INSERT INTO blackmarket_auctions (auctionId, templateId, startTime, currentBidder, currentBid, minIncrement, numBids) VALUES (?, ?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_UPD_BLACKMARKET_AUCTION, "UPDATE blackmarket_auctions SET currentBidder = ?, currentBid = ?, minIncrement = ?, numBids = ? WHERE auctionId = ?", CONNECTION_ASYNC);
+
+    PrepareStatement(CHAR_SEL_CLUSTER_CORPSE_MAP, "SELECT mapId FROM corpse WHERE guid = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_CLUSTER_PARTY_ONLINE_ON_MAP, "SELECT c.guid FROM party_member pm INNER JOIN characters c ON c.guid = pm.memberGuid WHERE pm.guid = ? AND c.online = 1 AND c.map = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_CLUSTER_PARTY_LEADER, "SELECT leaderGuid FROM parties WHERE guid = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_CLUSTER_FRIENDS_ON_MAP, "SELECT DISTINCT c.guid FROM character_social s INNER JOIN characters c ON c.guid = s.friend WHERE s.guid = ? AND (s.flags & ?) <> 0 AND c.online = 1 AND c.map = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_CLUSTER_GUILD_MATES_ON_MAP, "SELECT DISTINCT c.guid FROM guild_member mine INNER JOIN guild_member mate ON mate.guildid = mine.guildid AND mate.guid <> mine.guid INNER JOIN characters c ON c.guid = mate.guid WHERE mine.guid = ? AND c.online = 1 AND c.map = ?", CONNECTION_SYNCH);
 }
 

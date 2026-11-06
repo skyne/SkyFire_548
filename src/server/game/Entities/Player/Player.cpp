@@ -20,6 +20,7 @@
 #include "Chat.h"
 #include "ClusterLinkSession.h"
 #include "ClusterMgr.h"
+#include "ClusterPlacement.h"
 #include "Common.h"
 #include "ConditionMgr.h"
 #include "CreatureAI.h"
@@ -2144,11 +2145,46 @@ bool Player::CanMigrateSafely() const
     return true;
 }
 
-bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options)
+void Player::NotePartyDesiredLayer(uint32 characterGuid, uint32 mapId, uint32 nodeId)
 {
-    if (!sClusterMgr->IsEnabled() || sClusterMgr->OwnsMap(mapid))
+    if (!characterGuid || !nodeId)
+        return;
+
+    // Other online members already standing on this map. A resurrectable corpse
+    // on the map stays put; ClusterMgr also skips corpses when it drains.
+    QueryResult result = CharacterDatabase.PQuery(
+        "SELECT pm.memberGuid FROM party_member self "
+        "INNER JOIN party_member pm ON pm.guid = self.guid "
+        "INNER JOIN characters c ON c.guid = pm.memberGuid "
+        "LEFT JOIN corpse co ON co.guid = pm.memberGuid AND co.mapId = %u AND co.corpseType <> 0 "
+        "WHERE self.memberGuid = %u AND pm.memberGuid <> %u AND c.map = %u AND c.online = 1 AND co.corpseGuid IS NULL",
+        mapId, characterGuid, characterGuid, mapId);
+    if (!result)
+        return;
+
+    do
+    {
+        uint32 memberGuid = result->Fetch()[0].GetUInt32();
+        sClusterMgr->NoteDesiredLayer(memberGuid, mapId, nodeId);
+    } while (result->NextRow());
+}
+
+bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, float orientation, uint32 options, uint32 routedNode)
+{
+    if (!sClusterMgr->IsEnabled())
         return false;
     if (!GetSession() || !GetSession()->GetClusterLink())
+        return false;
+
+    // This node can host its own layer of the destination. Leave anyway when the
+    // saved route already names a different node; stay when the route is us.
+    // routedNode covers the write from this same call, which is queued async.
+    uint32 routeMap = 0;
+    uint32 routeNode = 0;
+    bool haveRoute = sClusterMgr->LookupAccountRoute(GetSession()->GetAccountId(), GetGUIDLow(), routeMap, routeNode);
+    bool routeElsewhere = haveRoute && routeNode && routeNode != sClusterMgr->GetNodeId() && routeMap == mapid;
+    bool routedAway = (routedNode && routedNode != sClusterMgr->GetNodeId()) || routeElsewhere;
+    if (sClusterMgr->OwnsMap(mapid) && !routedAway)
         return false;
 
     bool force = (options & TELE_TO_CLUSTER_FORCE) != 0;
@@ -2178,7 +2214,6 @@ bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, floa
     Relocate(x, y, z, orientation);
     SetFallInformation(0, z);
     SaveToDB();
-    sClusterMgr->UpdateAccountRoute(GetSession()->GetAccountId(), GetGUIDLow(), mapid);
 
     Skyfire::Cluster::HandoffPayload payload;
     payload.AccountId = GetSession()->GetAccountId();
@@ -2194,7 +2229,7 @@ bool Player::RequestClusterHandoff(uint32 mapid, float x, float y, float z, floa
     if (force)
         payload.Flags |= Skyfire::Cluster::HANDOFF_FLAG_FORCE;
 
-    ClusterLinkSession* link = GetSession()->GetClusterLink();
+    std::shared_ptr<ClusterLinkSession> link = GetSession()->GetClusterLink();
     link->SendHandoff(payload);
     SF_LOG_INFO("maps", "Player %s handing off to map %u on another cluster node.", GetName().c_str(), mapid);
     if (IsInWorld())
@@ -2343,8 +2378,22 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         Map* oldmap = IsInWorld() ? GetMap() : NULL;
         // check if we can enter before stopping combat / removing pet / totems / interrupting spells
 
-        if (sClusterMgr->IsEnabled() && !sClusterMgr->OwnsMap(mapid))
-            return RequestClusterHandoff(mapid, x, y, z, orientation, options);
+        // Same-map teleports, including a forced far teleport, stay on this layer.
+        if (GetMapId() != mapid && sClusterMgr->IsEnabled())
+        {
+            ClusterPlaceResult place;
+            bool placed = ClusterPlacement::Choose(GetGUIDLow(), GetSession()->GetAccountId(), mapid,
+                ClusterPlaceReason::MapChange, place);
+            if (placed && place.nodeId)
+                sClusterMgr->UpdateAccountRoute(GetSession()->GetAccountId(), GetGUIDLow(), mapid, place.nodeId);
+            if (placed && place.nodeId != sClusterMgr->GetNodeId())
+            {
+                NotePartyDesiredLayer(GetGUIDLow(), mapid, place.nodeId);
+                return RequestClusterHandoff(mapid, x, y, z, orientation, options, place.nodeId);
+            }
+            if (!placed && !sClusterMgr->OwnsMap(mapid))
+                return RequestClusterHandoff(mapid, x, y, z, orientation, options);
+        }
 
         // Check enter rights before map getting to avoid creating instance copy for player
         // this check not dependent from map instance copy and same for all instance copies of selected map

@@ -12,6 +12,7 @@
 #include "Chat.h"
 #include "ClusterLinkSession.h"
 #include "ClusterMgr.h"
+#include "ClusterPlacement.h"
 #include "Common.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
@@ -1464,18 +1465,30 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPacket& recvData)
             float z = fields[2].GetFloat();
             float o = fields[3].GetFloat();
             uint32 mapId = fields[4].GetUInt32();
-            if (!sClusterMgr->OwnsMap(mapId))
+            uint32 characterGuid = GUID_LOPART(playerGuid);
+            ClusterPlaceResult place;
+            bool placed = ClusterPlacement::Choose(characterGuid, GetAccountId(), mapId, ClusterPlaceReason::Login, place);
+            if (placed && place.nodeId)
+            {
+                sClusterMgr->UpdateAccountRoute(GetAccountId(), characterGuid, mapId, place.nodeId);
+                Player::NotePartyDesiredLayer(characterGuid, mapId, place.nodeId);
+            }
+
+            // A successful choice names the layer, including when this node also hosts the map.
+            // Choose false keeps the exclusive-owner handoff. Do not record this node as the
+            // destination: the gateway would open us again instead of the map owner.
+            bool handoff = placed ? place.nodeId != sClusterMgr->GetNodeId() : !sClusterMgr->OwnsMap(mapId);
+            if (handoff)
             {
                 Skyfire::Cluster::HandoffPayload payload;
                 payload.AccountId = GetAccountId();
-                payload.CharacterGuid = GUID_LOPART(playerGuid);
+                payload.CharacterGuid = characterGuid;
                 payload.DestMap = mapId;
                 payload.X = x;
                 payload.Y = y;
                 payload.Z = z;
                 payload.O = o;
                 payload.Flags = Skyfire::Cluster::HANDOFF_FLAG_LOGIN;
-                sClusterMgr->UpdateAccountRoute(GetAccountId(), payload.CharacterGuid, mapId);
                 GetClusterLink()->SendHandoff(payload);
                 SF_LOG_INFO("maps", "Account %u character %u login handed off to map %u owner.",
                     GetAccountId(), payload.CharacterGuid, mapId);

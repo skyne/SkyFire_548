@@ -6,12 +6,17 @@
 #include "ClusterMgr.h"
 #include "Config.h"
 #include "DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Log.h"
 #include "MapManager.h"
+#include "Player.h"
 #include "World.h"
+#include "WorldSession.h"
 #include <cstdlib>
 #include <set>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
 
 extern uint32 realmID;
 
@@ -36,6 +41,8 @@ ClusterMgr::ClusterMgr() :
     _heartbeatInterval(5000),
     _staleSeconds(30),
     _migrationTimeoutMs(300000),
+    _layerSoftCap(80),
+    _layerHardCap(100),
     _heartbeatTimer(0),
     _reconcileTimer(0)
 {
@@ -94,6 +101,8 @@ void ClusterMgr::LoadConfig()
     _sharedToken = sConfigMgr->GetStringDefault("Cluster.SharedToken", "");
     ParseAvailableMaps(sConfigMgr->GetStringDefault("Cluster.AvailableMaps", ""));
     _migrationTimeoutMs = uint32(sConfigMgr->GetIntDefault("Cluster.MigrationTimeout", 300)) * 1000;
+    _layerSoftCap = uint32(sConfigMgr->GetIntDefault("Cluster.LayerSoftCap", 80));
+    _layerHardCap = uint32(sConfigMgr->GetIntDefault("Cluster.LayerHardCap", 100));
 
     if (_heartbeatInterval < 1000)
         _heartbeatInterval = 1000;
@@ -191,19 +200,21 @@ bool ClusterMgr::ClaimMaps()
     std::lock_guard<std::mutex> guard(_lock);
     for (uint32 mapId : _availableMaps)
     {
-        PreparedStatement* existing = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_MAP_OWNER);
-        existing->setUInt32(0, realmID);
-        existing->setUInt32(1, mapId);
-        if (PreparedQueryResult result = LoginDatabase.Query(existing))
+        MapEntry const* entry = sMapStore.LookupEntry(mapId);
+        if (!entry)
+            SF_LOG_ERROR("server.loading", "Map %u has no Map.dbc entry; claiming it exclusively.", mapId);
+        bool instanceable = !entry || entry->Instanceable();
+        if (instanceable)
         {
-            Field* fields = result->Fetch();
-            uint32 owner = fields[0].GetUInt32();
-            uint32 heartbeat = fields[1].GetUInt32();
-            uint32 now = uint32(time(NULL));
-            bool stale = heartbeat + _staleSeconds < now;
-            if (owner != _nodeId && !stale)
+            PreparedStatement* existing = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_MAP_OWNER);
+            existing->setUInt32(0, realmID);
+            existing->setUInt32(1, mapId);
+            existing->setUInt32(2, _nodeId);
+            existing->setUInt32(3, _staleSeconds);
+            if (PreparedQueryResult result = LoginDatabase.Query(existing))
             {
-                SF_LOG_ERROR("server.loading", "Map %u is already owned by live node %u.", mapId, owner);
+                Field* fields = result->Fetch();
+                SF_LOG_ERROR("server.loading", "Map %u is already owned by live node %u.", mapId, fields[0].GetUInt32());
                 return false;
             }
         }
@@ -226,6 +237,117 @@ void ClusterMgr::Heartbeat()
     stmt->setUInt32(0, _nodeId);
     stmt->setUInt32(1, realmID);
     LoginDatabase.Execute(stmt);
+    UpdateLayerPopulation();
+}
+
+void ClusterMgr::UpdateLayerPopulation()
+{
+    std::unordered_map<uint32, uint32> counts;
+    SessionMap const& sessions = sWorld->GetAllSessions();
+    for (SessionMap::const_iterator itr = sessions.begin(); itr != sessions.end(); ++itr)
+    {
+        WorldSession* session = itr->second;
+        Player* player = session ? session->GetPlayer() : NULL;
+        if (!player || !player->IsInWorld())
+            continue;
+
+        uint32 mapId = player->GetMapId();
+        MapEntry const* entry = sMapStore.LookupEntry(mapId);
+        if (!entry || entry->Instanceable() || !OwnsMap(mapId))
+            continue;
+        ++counts[mapId];
+    }
+
+    std::unordered_set<uint32> maps;
+    if (_ownsAllMaps)
+    {
+        for (uint32 mapId = 0; mapId < sMapStore.GetNumRows(); ++mapId)
+        {
+            MapEntry const* entry = sMapStore.LookupEntry(mapId);
+            if (entry && !entry->Instanceable())
+                maps.insert(mapId);
+        }
+    }
+    else
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        for (uint32 mapId : _availableMaps)
+        {
+            MapEntry const* entry = sMapStore.LookupEntry(mapId);
+            if (entry && !entry->Instanceable())
+                maps.insert(mapId);
+        }
+    }
+
+    for (uint32 mapId : maps)
+    {
+        uint32 population = 0;
+        std::unordered_map<uint32, uint32>::const_iterator found = counts.find(mapId);
+        if (found != counts.end())
+            population = found->second;
+
+        PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_CLUSTER_MAP_POPULATION);
+        stmt->setUInt32(0, population);
+        stmt->setUInt32(1, realmID);
+        stmt->setUInt32(2, mapId);
+        stmt->setUInt32(3, _nodeId);
+        LoginDatabase.Execute(stmt);
+    }
+}
+
+void ClusterMgr::DrainDesiredLayers()
+{
+    std::vector<Player*> players;
+    SessionMap const& sessions = sWorld->GetAllSessions();
+    for (SessionMap::const_iterator itr = sessions.begin(); itr != sessions.end(); ++itr)
+    {
+        WorldSession* session = itr->second;
+        Player* player = session ? session->GetPlayer() : NULL;
+        if (!player || !player->IsInWorld())
+            continue;
+        players.push_back(player);
+    }
+
+    for (Player* player : players)
+    {
+        if (!player->IsInWorld())
+            continue;
+
+        PreparedStatement* route = LoginDatabase.GetPreparedStatement(LOGIN_SEL_CLUSTER_ROUTE_DESIRED);
+        route->setUInt32(0, player->GetGUIDLow());
+        route->setUInt32(1, realmID);
+        PreparedQueryResult result = LoginDatabase.Query(route);
+        if (!result)
+            continue;
+
+        Field* fields = result->Fetch();
+        uint32 desiredNode = fields[0].GetUInt32();
+        uint32 routeMap = fields[1].GetUInt32();
+        if (!desiredNode || desiredNode == _nodeId || player->GetMapId() != routeMap)
+            continue;
+        if (!player->CanMigrateSafely())
+            continue;
+
+        bool corpseOnMap = false;
+        PreparedStatement* corpses = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CLUSTER_CORPSE_MAP);
+        corpses->setUInt32(0, player->GetGUIDLow());
+        if (PreparedQueryResult corpseResult = CharacterDatabase.Query(corpses))
+        {
+            do
+            {
+                if (corpseResult->Fetch()[0].GetUInt32() == player->GetMapId())
+                    corpseOnMap = true;
+            } while (corpseResult->NextRow());
+        }
+        if (corpseOnMap)
+            continue;
+
+        if (WorldSession* session = player->GetSession())
+            UpdateAccountRoute(session->GetAccountId(), player->GetGUIDLow(), player->GetMapId(), desiredNode);
+
+        player->RequestClusterHandoff(player->GetMapId(), player->GetPositionX(), player->GetPositionY(),
+            player->GetPositionZ(), player->GetOrientation(), uint32(TELE_TO_CLUSTER_FORCE), desiredNode);
+    }
 }
 
 void ClusterMgr::ReconcileMaps()
@@ -294,6 +416,7 @@ void ClusterMgr::Update(uint32 diff)
     {
         _heartbeatTimer = int32(_heartbeatInterval);
         Heartbeat();
+        DrainDesiredLayers();
     }
 
     _reconcileTimer -= int32(diff);
@@ -370,6 +493,11 @@ bool ClusterMgr::LookupAccountRoute(uint32 accountId, uint32 characterGuid, uint
 
 void ClusterMgr::UpdateAccountRoute(uint32 accountId, uint32 characterGuid, uint32 mapId)
 {
+    UpdateAccountRoute(accountId, characterGuid, mapId, _nodeId);
+}
+
+void ClusterMgr::UpdateAccountRoute(uint32 accountId, uint32 characterGuid, uint32 mapId, uint32 nodeId)
+{
     if (!_enabled)
         return;
 
@@ -378,6 +506,22 @@ void ClusterMgr::UpdateAccountRoute(uint32 accountId, uint32 characterGuid, uint
     stmt->setUInt32(1, characterGuid);
     stmt->setUInt32(2, realmID);
     stmt->setUInt32(3, mapId);
-    stmt->setUInt32(4, _nodeId);
+    stmt->setUInt32(4, nodeId);
+    stmt->setUInt32(5, nodeId);
+    // The gateway reads this row as soon as the handoff arrives. An async write
+    // loses that race and sends the player back to the node they just left.
+    LoginDatabase.DirectExecute(stmt);
+}
+
+void ClusterMgr::NoteDesiredLayer(uint32 characterGuid, uint32 mapId, uint32 nodeId)
+{
+    if (!_enabled)
+        return;
+
+    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_CLUSTER_ROUTE_DESIRED);
+    stmt->setUInt32(0, nodeId);
+    stmt->setUInt32(1, characterGuid);
+    stmt->setUInt32(2, realmID);
+    stmt->setUInt32(3, mapId);
     LoginDatabase.Execute(stmt);
 }

@@ -96,7 +96,7 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     _player(NULL),
     m_Socket(sock),
     m_InstanceSocket(NULL),
-    m_clusterLink(NULL),
+    m_clusterLink(),
     m_clusterHandedOff(false),
     m_clusterResumePending(false),
     m_clusterResumeGuid(0),
@@ -179,11 +179,11 @@ WorldSession::~WorldSession()
         m_InstanceSocket = NULL;
     }
 
-    if (m_clusterLink)
+    if (std::shared_ptr<ClusterLinkSession> link = m_clusterLink)
     {
-        m_clusterLink->DetachWorldSession();
-        m_clusterLink->Close();
-        m_clusterLink = NULL;
+        m_clusterLink.reset();
+        link->DetachWorldSession();
+        link->Close();
     }
 
     /// - If have unclosed socket, close it
@@ -236,9 +236,9 @@ uint32 WorldSession::GetGuidLow() const
 }
 
 /// Send a packet to the client
-void WorldSession::SetClusterLink(ClusterLinkSession* link)
+void WorldSession::SetClusterLink(std::shared_ptr<ClusterLinkSession> link)
 {
-    m_clusterLink = link;
+    m_clusterLink = std::move(link);
     if (m_clusterLink)
         ResetTimeOutTime();
 }
@@ -246,10 +246,10 @@ void WorldSession::SetClusterLink(ClusterLinkSession* link)
 void WorldSession::FinishClusterHandoff()
 {
     m_clusterHandedOff = true;
-    if (m_clusterLink)
+    if (std::shared_ptr<ClusterLinkSession> link = m_clusterLink)
     {
-        m_clusterLink->DetachWorldSession();
-        m_clusterLink = NULL;
+        m_clusterLink.reset();
+        link->DetachWorldSession();
     }
 }
 

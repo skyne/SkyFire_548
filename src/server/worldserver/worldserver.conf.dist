@@ -387,6 +387,20 @@ Cluster.StaleSeconds = 30
 Cluster.MigrationTimeout = 300
 
 #
+#    Cluster.LayerSoftCap
+#        Description: Preferred in-world player count for one continent layer (this node's copy of a map).
+#        Default:     80
+
+Cluster.LayerSoftCap = 80
+
+#
+#    Cluster.LayerHardCap
+#        Description: In-world player count at which a continent layer is full.
+#        Default:     100
+
+Cluster.LayerHardCap = 100
+
+#
 ###################################################################################################
 
 ###################################################################################################
