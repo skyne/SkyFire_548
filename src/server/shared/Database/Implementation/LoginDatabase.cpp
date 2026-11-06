@@ -64,6 +64,10 @@ void LoginDatabaseConnection::DoPrepareStatements()
     PrepareStatement(LOGIN_INS_REALM_CHARACTERS_INIT, "INSERT INTO realmcharacters (realmid, acctid, numchars) SELECT r.id, a.id, 0 FROM realmlist r CROSS JOIN account a LEFT JOIN realmcharacters rc ON rc.realmid = r.id AND rc.acctid = a.id WHERE rc.acctid IS NULL", CONNECTION_BOTH);
     PrepareStatement(LOGIN_UPD_EXPANSION, "UPDATE account SET expansion = ? WHERE id = ?", CONNECTION_ASYNC);
     PrepareStatement(LOGIN_UPD_ACCOUNT_BOOST, "UPDATE account SET hasBoost = ? WHERE id = ?", CONNECTION_ASYNC);
+    PrepareStatement(LOGIN_SEL_BATTLE_PAY_POINTS, "SELECT battle_pay_points FROM account WHERE id = ?", CONNECTION_SYNCH);
+    PrepareStatement(LOGIN_UPD_BATTLE_PAY_POINTS, "UPDATE account SET battle_pay_points = battle_pay_points - ? WHERE id = ? AND battle_pay_points >= ?", CONNECTION_SYNCH);
+    PrepareStatement(LOGIN_UPD_BATTLE_PAY_POINTS_ADD, "UPDATE account SET battle_pay_points = battle_pay_points + ? WHERE id = ?", CONNECTION_SYNCH);
+    PrepareStatement(LOGIN_INS_BATTLE_PAY_LOG, "INSERT INTO battle_pay_log (accountId, characterGuid, realm, productId, itemId, price) VALUES (?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
     PrepareStatement(LOGIN_UPD_ACCOUNT_LOCK, "UPDATE account SET locked = ? WHERE id = ?", CONNECTION_ASYNC);
     PrepareStatement(LOGIN_UPD_ACCOUNT_LOCK_CONTRY, "UPDATE account SET lock_country = ? WHERE id = ?", CONNECTION_ASYNC);
     PrepareStatement(LOGIN_INS_LOG, "INSERT INTO logs (time, realm, type, level, string) VALUES (?, ?, ?, ?, ?)", CONNECTION_ASYNC);

@@ -6,29 +6,6 @@
 #include "CharacterBoost.h"
 #include "WorldSession.h"
 
-void WorldSession::HandleBattlePayGetPurchaseList(WorldPacket& /*recvData*/)
-{
-    // Empty purchase list. The character screen asks for this and drops the
-    // connection if the request is ignored.
-    WorldPacket data(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, 8);
-    data.WriteBits(0, 19);
-    data.FlushBits();
-    data << uint32(0);
-    SendPacket(&data);
-}
-
-void WorldSession::HandleBattlePayGetProductList(WorldPacket& /*recvData*/)
-{
-    WorldPacket data(SMSG_BATTLE_PAY_GET_PRODUCT_LIST_RESPONSE, 12);
-    data.WriteBits(0, 19);
-    data.WriteBits(0, 19);
-    data.WriteBits(0, 20);
-    data.FlushBits();
-    data << uint32(0); // currency unknown
-    data << uint32(1); // store unavailable
-    SendPacket(&data);
-}
-
 void WorldSession::SetBoosting(bool boost, bool saveToDB)
 {
     m_hasBoost = boost;
