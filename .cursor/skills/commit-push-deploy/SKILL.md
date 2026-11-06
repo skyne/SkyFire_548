@@ -4,7 +4,7 @@ description: >-
   Commit, push, and watch the SkyFire realm deploy. Use when the user asks to
   commit and push, ship the current thread, or watch until the deployment is
   ready. Asks whether to commit all unstaged changes or just this thread's
-  related changes, then pushes and reports when the images workflow deploy job
+  related changes, then pushes and reports when the build workflow's roll step
   succeeds.
 ---
 
@@ -46,18 +46,18 @@ Push only the repo you committed. Do not push any other repo.
 
 ## 3. Watch the deployment
 
-Realm images and the cluster roll come from `.github/workflows/images.yml` in SkyFire_548. A push starts that workflow only when all of these are true:
+Realm images and the cluster roll come from `.github/workflows/ubuntu.yml` in SkyFire_548. One `build` job compiles once, publishes images from that build, then rolls the cluster. A push starts that workflow only when all of these are true:
 
 - the branch is `main` or `trunk`
-- the commit touches `src/**`, `CMakeLists.txt`, `cmake/**`, `dep/**`, `deploy/docker/**`, or `.github/workflows/images.yml`
-- for a push event, the Actions variable `SKYFIRE_DEPLOY` is `true` (otherwise the `deploy` job is skipped)
+- the commit changes something other than `sql/**`
+- for a push event, the Actions variable `SKYFIRE_DEPLOY` is `true` (otherwise the roll steps are skipped and the job still succeeds after publishing images)
 
 If the push cannot start a deploy, say that immediately and do not watch. Name the missing condition.
 
 Otherwise find the run for the commit you just pushed:
 
 ```bash
-gh run list --repo <owner>/<repo> --workflow images.yml --commit <full-sha> \
+gh run list --repo <owner>/<repo> --workflow ubuntu.yml --commit <full-sha> \
   --json databaseId,status,conclusion,headSha,url,displayTitle,event
 ```
 
@@ -68,7 +68,7 @@ gh run watch <databaseId> --exit-status
 gh run view <databaseId> --json conclusion,url,status,jobs
 ```
 
-The `publish` job builds and pushes `ghcr.io/<owner>/skyfire-{authserver,worldserver,clustergateway}:548`. The `deploy` job then rolls namespace `skyfire`: `authserver`, `clustergateway`, and world roles `oldworld`, `outland`, `northrend`, `pandaria`, `bg`. A world pod that still has players is left on the old process; the workflow can still succeed.
+The job builds with PCH, pushes `ghcr.io/<owner>/skyfire-{authserver,worldserver,clustergateway}:548` from that build, then the `Roll the realm` step rolls namespace `skyfire`: `authserver`, `clustergateway`, and world roles `oldworld`, `outland`, `northrend`, `pandaria`, `bg`. A world pod that still has players is left on the old process; the workflow can still succeed.
 
 If `gh run watch` returns while the run is still `in_progress` or `queued`, poll `gh run view` again until `conclusion` is set. Do not start a second deploy.
 
@@ -76,6 +76,6 @@ If `gh run watch` returns while the run is still `in_progress` or `queued`, poll
 
 Tell the user in chat. Lead with the outcome.
 
-**Deploy ready** — only when the `deploy` job `conclusion` is `success`. Include the commit subject, short sha, run URL, and that auth, the gateway, and the world roles were rolled. If the job log says a world was kept because players were connected, name that role.
+**Deploy ready** — only when the `build` job `conclusion` is `success` and its `Roll the realm` step `conclusion` is `success`. Include the commit subject, short sha, run URL, and that auth, the gateway, and the world roles were rolled. If the job log says a world was kept because players were connected, name that role.
 
-**Not ready** — `publish` succeeded but `deploy` was skipped or failed, or `publish` failed. Include the run URL and the failing job. Do not call this ready.
+**Not ready** — the job failed, or it succeeded while `Roll the realm` was skipped. Include the run URL and the failing step when there is one. Do not call this ready.
