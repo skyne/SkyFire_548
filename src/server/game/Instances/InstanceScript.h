@@ -122,7 +122,7 @@ typedef std::map<uint32 /*entry*/, MinionInfo> MinionInfoMap;
 class InstanceScript : public ZoneScript
 {
 public:
-    explicit InstanceScript(Map* map) : instance(map), completedEncounters(0) { }
+    explicit InstanceScript(Map* map) : instance(map), completedEncounters(0), _challengeCountdown(0), _challengeTime(0), _challengeMedal(CHALLENGE_MEDAL_NONE), _challengeStarted(false), _challengeCompleted(false) { }
 
     virtual ~InstanceScript() { }
 
@@ -218,6 +218,19 @@ public:
     // ReCheck PhaseTemplate related conditions
     void UpdatePhasing();
 
+    // Challenge mode. Calls are no-ops until SetChallengeModeStarted, and that
+    // itself does nothing unless the map is challenge difficulty.
+    // SkyFire adaptation of Pandaria 5.4.8 challenge-mode recording (GPL-2.0).
+    void SetChallengeDoorGuid(uint64 guid) { _challengeDoorGuids.push_back(guid); }
+    void SetChallengeModeStarted();
+    void ScheduleChallengeStartup(uint32 diff);
+    void ScheduleChallengeTimeUpdate(uint32 diff);
+    void CompleteChallengeMode();
+    void SendChallengeModeProgress(Player* player);
+    bool IsChallengeModeStarted() const { return _challengeStarted; }
+    bool IsChallengeModeCompleted() const { return _challengeCompleted; }
+    uint32 GetChallengeTime() const { return _challengeTime; }
+
 protected:
     void SetBossNumber(uint32 number) { bosses.resize(number); }
     void LoadDoorData(DoorData const* data);
@@ -236,6 +249,12 @@ private:
     DoorInfoMap doors;
     MinionInfoMap minions;
     uint32 completedEncounters; // completed encounter mask, bit indexes are DungeonEncounter.dbc boss numbers, used for packets
+    std::vector<uint64> _challengeDoorGuids;
+    uint32 _challengeCountdown;
+    uint32 _challengeTime;
+    uint8 _challengeMedal;
+    bool _challengeStarted;
+    bool _challengeCompleted;
 };
 
 template<class AI, class T>

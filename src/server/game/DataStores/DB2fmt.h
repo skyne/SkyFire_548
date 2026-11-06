@@ -37,5 +37,6 @@ char const KeyChainfmt[] = "nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 char const SceneScriptPackagefmt[] = "nx";
 //char const SceneScriptPackageMemberfmt[] = "nxxxx";
 char const SpellReagentsfmt[] = "diiiiiiiiiiiiiiiiii";
+char const MapChallengeModefmt[] = "nixxxiiixx";
 
 #endif

@@ -6,15 +6,18 @@
 #include "Creature.h"
 #include "CreatureAI.h"
 #include "DatabaseEnv.h"
+#include "DB2Stores.h"
 #include "GameObject.h"
 #include "Group.h"
 #include "InstanceScript.h"
 #include "LFGMgr.h"
 #include "Log.h"
 #include "Map.h"
+#include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Pet.h"
 #include "Player.h"
+#include "World.h"
 #include "WorldSession.h"
 
 void InstanceScript::SaveToDB()
@@ -210,6 +213,9 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
 
         for (MinionSet::iterator i = bossInfo->minion.begin(); i != bossInfo->minion.end(); ++i)
             UpdateMinionState(*i, state);
+
+        if (state == DONE && id + 1 == bosses.size())
+            CompleteChallengeMode();
 
         return true;
     }
@@ -504,4 +510,208 @@ void InstanceScript::UpdatePhasing()
     for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
         if (Player* player = itr->GetSource())
             player->UpdatePhasing();
+}
+
+namespace
+{
+    enum
+    {
+        CHALLENGE_ELAPSED_TIMER = 1
+    };
+    uint32 const CHALLENGE_START_COUNTDOWN_SECONDS = 5;
+
+    bool FindChallengeMedalThresholds(uint32 mapId, uint32& goldMs, uint32& silverMs, uint32& bronzeMs)
+    {
+        for (uint32 i = 0; i < sMapChallengeModeStore.GetNumRows(); ++i)
+        {
+            MapChallengeModeEntry const* entry = sMapChallengeModeStore.LookupEntry(i);
+            if (!entry || entry->MapID != mapId)
+                continue;
+
+            if (!entry->GoldTime && !entry->SilverTime && !entry->BronzeTime)
+                return false;
+
+            goldMs = entry->GoldTime * IN_MILLISECONDS;
+            silverMs = entry->SilverTime * IN_MILLISECONDS;
+            bronzeMs = entry->BronzeTime * IN_MILLISECONDS;
+            return true;
+        }
+
+        return false;
+    }
+}
+
+void InstanceScript::SetChallengeModeStarted()
+{
+    if (_challengeStarted || _challengeCompleted || !instance->IsChallengeDungeon())
+        return;
+
+    _challengeStarted = true;
+    _challengeMedal = CHALLENGE_MEDAL_GOLD;
+    _challengeCountdown = CHALLENGE_START_COUNTDOWN_SECONDS * IN_MILLISECONDS;
+
+    WorldPacket data(SMSG_START_TIMER, 12);
+    data << uint32(CHALLENGE_START_COUNTDOWN_SECONDS);
+    data << uint32(CHALLENGE_START_COUNTDOWN_SECONDS);
+    data << uint32(CHALLENGE_ELAPSED_TIMER);
+    instance->SendToPlayers(&data);
+}
+
+void InstanceScript::ScheduleChallengeStartup(uint32 diff)
+{
+    if (!_challengeStarted || _challengeCompleted || !_challengeCountdown)
+        return;
+
+    if (_challengeCountdown > diff)
+    {
+        _challengeCountdown -= diff;
+        return;
+    }
+
+    _challengeCountdown = 0;
+    for (std::vector<uint64>::const_iterator itr = _challengeDoorGuids.begin(); itr != _challengeDoorGuids.end(); ++itr)
+        if (GameObject* door = instance->GetGameObject(*itr))
+            door->SetGoState(GOState::GO_STATE_ACTIVE);
+
+    WorldPacket data(SMSG_START_ELAPSED_TIMER, 8);
+    data << uint32(0);
+    data << uint32(CHALLENGE_ELAPSED_TIMER);
+    instance->SendToPlayers(&data);
+}
+
+void InstanceScript::ScheduleChallengeTimeUpdate(uint32 diff)
+{
+    if (!_challengeStarted || _challengeCompleted || _challengeCountdown)
+        return;
+
+    _challengeTime += diff;
+
+    uint32 goldMs = 0;
+    uint32 silverMs = 0;
+    uint32 bronzeMs = 0;
+    if (!FindChallengeMedalThresholds(instance->GetId(), goldMs, silverMs, bronzeMs))
+        return;
+
+    uint32 thresholds[CHALLENGE_MEDAL_GOLD];
+    thresholds[CHALLENGE_MEDAL_BRONZE - 1] = bronzeMs;
+    thresholds[CHALLENGE_MEDAL_SILVER - 1] = silverMs;
+    thresholds[CHALLENGE_MEDAL_GOLD - 1] = goldMs;
+
+    while (_challengeMedal > CHALLENGE_MEDAL_NONE && _challengeTime > thresholds[_challengeMedal - 1])
+        --_challengeMedal;
+}
+
+void InstanceScript::SendChallengeModeProgress(Player* player)
+{
+    if (!player || !_challengeStarted || _challengeCompleted || _challengeCountdown)
+        return;
+
+    WorldPacket data(SMSG_START_ELAPSED_TIMER, 8);
+    data << uint32(_challengeTime / 100);
+    data << uint32(CHALLENGE_ELAPSED_TIMER);
+    player->GetSession()->SendPacket(&data);
+}
+
+void InstanceScript::CompleteChallengeMode()
+{
+    if (!_challengeStarted || _challengeCompleted || _challengeCountdown)
+        return;
+
+    _challengeStarted = false;
+    _challengeCompleted = true;
+
+    WorldPacket stop(SMSG_STOP_ELAPSED_TIMER, 5);
+    stop.WriteBit(false);
+    stop.FlushBits();
+    stop << uint32(CHALLENGE_ELAPSED_TIMER);
+    instance->SendToPlayers(&stop);
+
+    uint32 const now = uint32(time(NULL));
+    uint32 memberIndex = 0;
+    RealmCompletedChallenge record;
+    record.AttemptId = 0;
+    record.CompletionTime = _challengeTime;
+    record.CompletionDate = now;
+    record.MedalEarned = _challengeMedal;
+
+    uint32 guildId = 0;
+    Map::PlayerList const& players = instance->GetPlayers();
+    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end() && memberIndex < 5; ++itr)
+    {
+        Player* player = itr->GetSource();
+        if (!player)
+            continue;
+
+        record.Members[memberIndex].Guid = player->GetGUIDLow();
+        record.Members[memberIndex].SpecId = player->GetTalentSpecialization(player->GetActiveSpec());
+        ++memberIndex;
+
+        if (!guildId)
+            if (Group* group = player->GetGroup())
+                if (group->IsGuildGroup(player->GetGuildId(), player))
+                    guildId = player->GetGuildId();
+    }
+    record.MembersCount = uint8(memberIndex);
+
+    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
+    {
+        Player* player = itr->GetSource();
+        if (!player || !player->GetSession())
+            continue;
+
+        CompletedChallenge stored;
+        bool const newBestTime = sObjectMgr->RecordCharacterChallenge(player->GetGUIDLow(), instance->GetId(), _challengeTime, _challengeMedal, stored);
+        if (newBestTime)
+        {
+            player->GetSession()->SendChallengeModeMapStatsUpdate(instance->GetId());
+
+            WorldPacket recordPacket(SMSG_CHALLENGE_MODE_NEW_PLAYER_RECORD, 12);
+            recordPacket << uint32(instance->GetId());
+            recordPacket << uint32(_challengeMedal);
+            recordPacket << uint32(_challengeTime);
+            player->GetSession()->SendPacket(&recordPacket);
+        }
+    }
+
+    ChallengeReward reward;
+    uint32 money = 0;
+    uint32 valor = 0;
+    if (_challengeMedal < 4 && sObjectMgr->GetChallengeReward(instance->GetId(), reward))
+    {
+        money = reward.MoneyReward[_challengeMedal];
+        valor = reward.ValorReward[_challengeMedal];
+        for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
+        {
+            if (Player* player = itr->GetSource())
+            {
+                if (money)
+                    player->ModifyMoney(int64(money));
+                if (valor)
+                    player->ModifyCurrency(CURRENCY_TYPE_VALOR_POINTS, int32(valor), true);
+            }
+        }
+    }
+
+    uint32 const currencyRewards = valor != 0 ? 1 : 0;
+    WorldPacket complete(SMSG_CHALLENGE_MODE_COMPLETE, 16);
+    complete << uint32(money);
+    complete << uint32(instance->GetId());
+    complete << uint32(_challengeMedal);
+    complete << uint32(_challengeTime);
+    complete.WriteBits(currencyRewards, 21);
+    complete.WriteBits(0, 20);
+    if (currencyRewards)
+    {
+        complete << uint32(CURRENCY_TYPE_VALOR_POINTS);
+        complete << uint32(valor);
+    }
+    complete.FlushBits();
+    instance->SendToPlayers(&complete);
+
+    sObjectMgr->RecordRealmChallenge(instance->GetId(), record);
+    if (guildId)
+    {
+        record.GuildId = guildId;
+        sObjectMgr->RecordGuildChallenge(instance->GetId(), record);
+    }
 }

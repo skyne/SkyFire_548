@@ -43,6 +43,7 @@ DB2Storage<KeyChainEntry>                   sKeyChainStore(KeyChainfmt);
 DB2Storage<SceneScriptPackageEntry>         sSceneScriptPackageStore(SceneScriptPackagefmt);
 //DB2Storage<SceneScriptPackageMemberEntry>   sSceneScriptPackageMemberStore(SceneScriptPackageMemberfmt);
 DB2Storage<SpellReagentsEntry>              sSpellReagentsStore(SpellReagentsfmt);
+DB2Storage<MapChallengeModeEntry>          sMapChallengeModeStore(MapChallengeModefmt);
 
 BattlePetBreedSet                           sBattlePetBreedSet;
 BattlePetItemXSpeciesStore                  sBattlePetItemXSpeciesStore;
@@ -112,6 +113,21 @@ inline void LoadDB2(uint32& availableDb2Locales, DB2StoreProblemList& errlist, D
     DB2Stores[storage.GetHash()] = &storage;
 }
 
+template<class T>
+inline void LoadOptionalDB2(DB2Storage<T>& storage, std::string const& db2_path, std::string const& filename)
+{
+    ASSERT(DB2FileLoader::GetFormatRecordSize(storage.GetFormat()) == sizeof(T) || LoadDB2_assert_print(DB2FileLoader::GetFormatRecordSize(storage.GetFormat()), sizeof(T), filename));
+
+    std::string db2_filename = db2_path + filename;
+    if (!storage.Load(db2_filename.c_str(), uint32(sWorld->GetDefaultDbcLocale())))
+    {
+        SF_LOG_INFO("misc", "Optional DB2 %s was not loaded.", filename.c_str());
+        return;
+    }
+
+    DB2Stores[storage.GetHash()] = &storage;
+}
+
 void LoadDB2Stores(std::string const& dataPath)
 {
     std::string db2Path = dataPath + "db2/";
@@ -150,6 +166,7 @@ void LoadDB2Stores(std::string const& dataPath)
     LoadDB2(availableDb2Locales, bad_db2_files, sSceneScriptPackageStore, db2Path, "SceneScriptPackage.db2");
     //LoadDB2(availableDb2Locales, bad_db2_files, sSceneScriptStore,              db2Path, "SceneScript.db2");
     LoadDB2(availableDb2Locales, bad_db2_files, sSpellReagentsStore, db2Path, "SpellReagents.db2");
+    LoadOptionalDB2(sMapChallengeModeStore, db2Path, "MapChallengeMode.db2");
 
     for (uint32 i = 0; i < sBattlePetBreedStateStore.GetNumRows(); i++)
         if (BattlePetBreedStateEntry const* breedStateEntry = sBattlePetBreedStateStore.LookupEntry(i))

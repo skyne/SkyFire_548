@@ -379,6 +379,7 @@ public:
     bool IsRaid() const { return i_mapEntry && i_mapEntry->IsRaid(); }
     bool IsRaidOrHeroicDungeon() const { return IsRaid() || i_spawnMode == DIFFICULTY_HEROIC; }
     bool IsHeroic() const;
+    bool IsChallengeDungeon() const { return IsDungeon() && GetDifficulty() == DIFFICULTY_CHALLENGE; }
     bool Is25ManRaid() const;
     bool IsBattleground() const { return i_mapEntry && i_mapEntry->IsBattleground(); }
     bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
