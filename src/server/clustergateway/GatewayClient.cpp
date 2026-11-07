@@ -348,8 +348,16 @@ int GatewayClient::HandleIncoming(uint16 opcode, ByteBuffer& body)
             return HandleAuthSession(body);
         case Skyfire::Cluster::WIRE_CMSG_PING:
             return HandlePing(body);
-        case Skyfire::Cluster::WIRE_CMSG_KEEP_ALIVE:
         case Skyfire::Cluster::WIRE_CMSG_LOG_DISCONNECT:
+        {
+            uint32 reason = 0;
+            if (body.size() >= body.rpos() + sizeof(uint32))
+                body >> reason;
+            SF_LOG_ERROR("server.clustergateway", "Client %s account %u sent CMSG_LOG_DISCONNECT reason %u.",
+                _address.c_str(), _accountId, reason);
+            return 0;
+        }
+        case Skyfire::Cluster::WIRE_CMSG_KEEP_ALIVE:
         case Skyfire::Cluster::WIRE_CMSG_ENABLE_NAGLE:
             return 0;
         default:
