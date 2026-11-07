@@ -167,6 +167,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Texts
   ${CMAKE_SOURCE_DIR}/src/server/game/Tickets
   ${CMAKE_SOURCE_DIR}/src/server/game/Tools
+  # Player.h includes VignetteMgr.h, so the scripts PCH needs this directory.
   ${CMAKE_SOURCE_DIR}/src/server/game/Vignette
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden/Modules

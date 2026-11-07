@@ -131,6 +131,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells/Auras
   ${CMAKE_SOURCE_DIR}/src/server/game/Tools
+  # Player.h includes VignetteMgr.h, so worldserver needs this directory.
   ${CMAKE_SOURCE_DIR}/src/server/game/Vignette
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden/Modules
