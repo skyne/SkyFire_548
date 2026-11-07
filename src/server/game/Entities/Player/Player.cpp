@@ -863,7 +863,16 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
         return false;
     }
 
-    SetMap(sMapMgr->CreateMap(info->mapId, this));
+    // Character creation never enters the world, so it must not require this
+    // node to own the starting map. Only the location is persisted; login hands
+    // the session off to the map owner before the player is added to a map.
+    if (sClusterMgr->OwnsMap(info->mapId))
+        SetMap(sMapMgr->CreateMap(info->mapId, this));
+    else
+    {
+        SetLocationMapId(info->mapId);
+        SetLocationInstanceId(0);
+    }
 
     uint8 powerType = cEntry->powerType;
 
