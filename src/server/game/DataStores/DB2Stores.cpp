@@ -43,6 +43,7 @@ DB2Storage<KeyChainEntry>                   sKeyChainStore(KeyChainfmt);
 DB2Storage<SceneScriptPackageEntry>         sSceneScriptPackageStore(SceneScriptPackagefmt);
 //DB2Storage<SceneScriptPackageMemberEntry>   sSceneScriptPackageMemberStore(SceneScriptPackageMemberfmt);
 DB2Storage<SpellReagentsEntry>              sSpellReagentsStore(SpellReagentsfmt);
+DB2Storage<VignetteEntry>                   sVignetteStore(Vignettefmt);
 
 BattlePetBreedSet                           sBattlePetBreedSet;
 BattlePetItemXSpeciesStore                  sBattlePetItemXSpeciesStore;
@@ -150,6 +151,7 @@ void LoadDB2Stores(std::string const& dataPath)
     LoadDB2(availableDb2Locales, bad_db2_files, sSceneScriptPackageStore, db2Path, "SceneScriptPackage.db2");
     //LoadDB2(availableDb2Locales, bad_db2_files, sSceneScriptStore,              db2Path, "SceneScript.db2");
     LoadDB2(availableDb2Locales, bad_db2_files, sSpellReagentsStore, db2Path, "SpellReagents.db2");
+    LoadDB2(availableDb2Locales, bad_db2_files, sVignetteStore, db2Path, "Vignette.db2");
 
     for (uint32 i = 0; i < sBattlePetBreedStateStore.GetNumRows(); i++)
         if (BattlePetBreedStateEntry const* breedStateEntry = sBattlePetBreedStateStore.LookupEntry(i))

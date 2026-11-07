@@ -37,5 +37,7 @@ char const KeyChainfmt[] = "nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 char const SceneScriptPackagefmt[] = "nx";
 //char const SceneScriptPackageMemberfmt[] = "nxxxx";
 char const SpellReagentsfmt[] = "diiiiiiiiiiiiiiiiii";
+// Vignette.db2, build 5.4.0.17266-5.4.8.18414: Id, Name_lang, QuestFeedbackEffectID, Flags, MaxHeight, MinHeight.
+char const Vignettefmt[] = "nsiiff";
 
 #endif

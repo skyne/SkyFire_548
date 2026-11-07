@@ -506,6 +506,17 @@ struct SpellReagentsEntry
     uint32    ReagentCount[MAX_SPELL_REAGENTS2];             // 11 - 20   m_reagentCount
 };
 
+// Vignette.db2 (5.4.8.18414). Field order matches the client file.
+struct VignetteEntry
+{
+    uint32 Id;                                              // 0 Id
+    LocalizedString* Name;                                  // 1 Name_lang
+    uint32 QuestFeedbackEffectID;                           // 2 QuestFeedbackEffectID
+    uint32 Flags;                                           // 3 Flags
+    float MaxHeight;                                        // 4 MaxHeight
+    float MinHeight;                                        // 5 MinHeight
+};
+
 // GCC has alternative #pragma pack(N) syntax and old gcc version does not support pack(push, N), also any gcc version does not support it at some platform
 #if defined(__GNUC__)
 #pragma pack()

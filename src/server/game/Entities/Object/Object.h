@@ -764,6 +764,13 @@ public:
     void GetCreatureListWithEntryInGrid(std::list<Creature*>& lList, uint32 uiEntry, float fMaxSearchRange) const;
     void GetPlayerListInGrid(std::list<Player*>& lList, float fMaxSearchRange) const;
 
+    // Client Vignette.db2 id. 0 means this object has no minimap marker.
+    // Unknown ids are logged once and stored as 0. SkyFire has no vignette column on creature_template.
+    void SetVignette(uint32 vignetteId, uint32 trackingQuestId = 0);
+    void ClearVignette() { SetVignette(0, 0); }
+    uint32 GetVignetteId() const { return m_vignetteId; }
+    uint32 GetVignetteTrackingQuest() const { return m_vignetteTrackingQuest; }
+
     void DestroyForNearbyPlayers();
     virtual void UpdateObjectVisibility(bool forced = true);
     void BuildUpdate(UpdateDataMapType&);
@@ -846,6 +853,8 @@ private:
 
     uint16 m_notifyflags;
     uint16 m_executed_notifies;
+    uint32 m_vignetteId;
+    uint32 m_vignetteTrackingQuest;
     virtual bool _IsWithinDist(WorldObject const* obj, float dist2compare, bool is3D) const;
 
     bool CanNeverSee(WorldObject const* obj) const;

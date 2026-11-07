@@ -49,6 +49,7 @@ extern DB2Storage<KeyChainEntry> sKeyChainStore;
 //extern DB2Storage<SceneScriptEntry> sSceneScriptStore;
 extern DB2Storage<SceneScriptPackageEntry> sSceneScriptPackageStore;
 extern DB2Storage<SpellReagentsEntry> sSpellReagentsStore;
+extern DB2Storage<VignetteEntry> sVignetteStore;
 
 void LoadDB2Stores(std::string const& dataPath);
 

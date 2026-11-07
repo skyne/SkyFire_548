@@ -25,7 +25,8 @@ enum HighGuid
     HIGHGUID_LOOT = 0xF19,                       // blizz F190 (loot object of a lootable source)
     HIGHGUID_MO_TRANSPORT = 0x1FC,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
     HIGHGUID_GROUP = 0x1F5,
-    HIGHGUID_GUILD = 0x1FF                        // new 4.x
+    HIGHGUID_GUILD = 0x1FF,                       // new 4.x
+    HIGHGUID_VIGNETTE = 0x200                     // 5.4.8 minimap vignette
 };
 
 // used for creating values for respawn for example
@@ -237,6 +238,7 @@ bool IsGuidHaveEnPart(uint64 guid)
         case HIGHGUID_VEHICLE:
         case HIGHGUID_MO_TRANSPORT:
         case HIGHGUID_AREATRIGGER:
+        case HIGHGUID_VIGNETTE:
         default:
             return true;
     }
@@ -260,6 +262,7 @@ char const* GetLogNameForGuid(uint64 guid)
         case HIGHGUID_GUILD:        return "guild";
         case HIGHGUID_LOOT:         return "loot";
         case HIGHGUID_AREATRIGGER:  return "areatrigger";
+        case HIGHGUID_VIGNETTE:     return "vignette";
         default:
             return "<unknown>";
     }
