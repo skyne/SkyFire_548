@@ -157,8 +157,8 @@ jobs:
             done
 
             drain=$(printf '%s' "hex=\$(printf %04X ${port}); while awk -v p=\"\$hex\" 'NR>1 { split(\$2,a,\":\"); if (toupper(a[2])==toupper(p) && \$4==\"01\") e=1 } END { exit !e }' /proc/net/tcp /proc/net/tcp6; do sleep 5; done")
-            NAME="$name" IMAGE="$image" DRAIN="$drain" python3 -c 'import json,os; print(json.dumps({"spec":{"minReadySeconds":600,"progressDeadlineSeconds":86400,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":1,"maxUnavailable":0}},"template":{"spec":{"terminationGracePeriodSeconds":86400,"imagePullSecrets":[{"name":"ghcr-pull"}],"containers":[{"name":os.environ["NAME"],"image":os.environ["IMAGE"],"imagePullPolicy":"Always","lifecycle":{"preStop":{"exec":{"command":["bash","-c",os.environ["DRAIN"]]}}}}]}}}}))' > /tmp/front-patch.json
-            kubectl -n "$ns" patch "deploy/${name}" --type=strategic --patch-file /tmp/front-patch.json
+            NAME="$name" IMAGE="$image" DRAIN="$drain" python3 -c 'import json,os; print(json.dumps({"spec":{"minReadySeconds":600,"progressDeadlineSeconds":86400,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":1,"maxUnavailable":0}},"template":{"spec":{"terminationGracePeriodSeconds":86400,"imagePullSecrets":[{"name":"ghcr-pull"}],"containers":[{"name":os.environ["NAME"],"image":os.environ["IMAGE"],"imagePullPolicy":"Always","lifecycle":{"preStop":{"exec":{"command":["bash","-c",os.environ["DRAIN"]]}}}}]}}}}))' > "/tmp/front-patch-${name}.json"
+            kubectl -n "$ns" patch "deploy/${name}" --type=strategic --patch-file "/tmp/front-patch-${name}.json"
 
             local deadline=$((SECONDS + 900))
             local fresh=""
@@ -200,21 +200,43 @@ jobs:
             kubectl -n "$ns" rollout status "statefulset/world-${role}" --timeout=300s
           }
 
-          roll_front authserver 3724
-          roll_front clustergateway 8085
+          wait_all() {
+            local pid status=0
+            for pid in "$@"; do
+              wait "$pid" || status=1
+            done
+            return "$status"
+          }
+
+          pids=()
+          roll_front authserver 3724 &
+          pids+=($!)
+          roll_front clustergateway 8085 &
+          pids+=($!)
           for role in oldworld outland northrend pandaria bg; do
-            roll_world "$role"
+            roll_world "$role" &
+            pids+=($!)
           done
+          wait_all "${pids[@]}"
+
           # The pull token dies with this job. Keep the image that is already on
           # the node, and do not ask the registry again on the next restart.
+          pids=()
           for name in authserver clustergateway; do
-            kubectl -n "$ns" patch "deploy/${name}" --type=strategic -p "{\"spec\":{\"minReadySeconds\":0,\"template\":{\"spec\":{\"containers\":[{\"name\":\"${name}\",\"imagePullPolicy\":\"IfNotPresent\"}]}}}}"
-            kubectl -n "$ns" rollout status "deploy/${name}" --timeout=300s
+            (
+              kubectl -n "$ns" patch "deploy/${name}" --type=strategic -p "{\"spec\":{\"minReadySeconds\":0,\"template\":{\"spec\":{\"containers\":[{\"name\":\"${name}\",\"imagePullPolicy\":\"IfNotPresent\"}]}}}}"
+              kubectl -n "$ns" rollout status "deploy/${name}" --timeout=300s
+            ) &
+            pids+=($!)
           done
           for role in oldworld outland northrend pandaria bg; do
-            kubectl -n "$ns" patch "statefulset/world-${role}" --type=strategic -p '{"spec":{"template":{"spec":{"containers":[{"name":"worldserver","imagePullPolicy":"IfNotPresent"}]}}}}'
-            kubectl -n "$ns" rollout status "statefulset/world-${role}" --timeout=300s
+            (
+              kubectl -n "$ns" patch "statefulset/world-${role}" --type=strategic -p '{"spec":{"template":{"spec":{"containers":[{"name":"worldserver","imagePullPolicy":"IfNotPresent"}]}}}}'
+              kubectl -n "$ns" rollout status "statefulset/world-${role}" --timeout=300s
+            ) &
+            pids+=($!)
           done
+          wait_all "${pids[@]}"
           kubectl -n "$ns" delete secret ghcr-pull --ignore-not-found
           kubectl -n "$ns" get pods -o wide
           not_ready=$(kubectl -n "$ns" get pods --no-headers | awk '$2 != "1/1" || $3 != "Running" { print }')

@@ -3,24 +3,28 @@ name: commit-push-deploy
 description: >-
   Commit, push, and watch the SkyFire realm deploy. Use when the user asks to
   commit and push, ship the current thread, or watch until the deployment is
-  ready. Asks whether to commit all unstaged changes or just this thread's
-  related changes, turns SKYFIRE_DEPLOY on for that push, then pushes and
+  ready. When uncommitted work includes changes from outside this thread, asks
+  whether to commit all unstaged changes or just this thread's related changes.
+  When every committable change belongs to this thread, commits that set
+  without asking. Turns SKYFIRE_DEPLOY on for that push, then pushes and
   reports when the build workflow's roll step succeeds. Turns the variable
   off again after the run finishes.
 ---
 
 # Commit, push, and watch the deploy
 
-Do not stage, commit, or push until the user answers the scope question below.
+Do not stage, commit, or push until the scope is settled: either the sets match and you commit this thread, or the user answers the question below.
 
-## 1. Ask what to commit
+## 1. Choose what to commit
 
 Inspect the repo that contains the work (`git status`, `git diff`, `git log -8 --oneline`). List two sets:
 
 - **All unstaged changes** — every unstaged modification and untracked file in that repo. Leave out secrets (`.env`, credentials, keys).
 - **This thread only** — files this conversation created or edited. If a file was also edited outside this thread, still include it only when this thread changed it.
 
-Ask with the AskQuestion tool, one question, these options, before any git write:
+If the two sets contain the same paths, do not ask. Commit **This thread only**. Say that you skipped the question because nothing else is uncommitted. If that set is empty, say so and stop.
+
+If **All unstaged changes** contains any path that is not in **This thread only**, ask with the AskQuestion tool, one question, these options, before any git write:
 
 - All unstaged changes
 - Just this thread's related changes
