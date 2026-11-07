@@ -23,6 +23,7 @@ enum HighGuid
     HIGHGUID_AREATRIGGER = 0xF102,                      // blizz F100
     HIGHGUID_BATTLEGROUND = 0x1F1,                       // new 4.x
     HIGHGUID_LOOT = 0xF19,                       // blizz F190 (loot object of a lootable source)
+    HIGHGUID_SCENARIO = 0xF18,                   // blizz scenario guid, 5.4.8
     HIGHGUID_MO_TRANSPORT = 0x1FC,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
     HIGHGUID_GROUP = 0x1F5,
     HIGHGUID_GUILD = 0x1FF                        // new 4.x

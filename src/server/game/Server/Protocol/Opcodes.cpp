@@ -382,6 +382,7 @@ void OpcodeTable::InitializeClientTable()
     DEFINE_OPCODE_HANDLER(CMSG_QUERY_GUILD_REWARDS,                     0x06C4, STATUS_LOGGEDIN,                     PROCESS_INPLACE,      &WorldSession::HandleGuildRewardsQueryOpcode         ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_QUERY_GUILD_XP,                          0x05F8, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryXPOpcode              ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_QUERY_INSPECT_ACHIEVEMENTS,              0x0373, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleQueryInspectAchievements        ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(CMSG_QUERY_SCENARIO_POI,                      0x1A22, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleQueryScenarioPOI                ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_QUERY_TIME,                              0x0640, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleQueryTimeOpcode                 ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_QUESTLOG_REMOVE_QUEST,                   0x0779, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleQuestLogRemoveQuest             ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_QUEST_CONFIRM_ACCEPT,                    0x124B, STATUS_LOGGEDIN,                     PROCESS_THREADUNSAFE, &WorldSession::HandleQuestConfirmAccept              ); // 5.4.8 18414
@@ -994,6 +995,9 @@ void OpcodeTable::InitializeServerTable()
     DEFINE_OPCODE_HANDLER(SMSG_RESURRECT_REQUEST,                              0x1062, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_RESYNC_RUNES,                                   0x15E3, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_SAVE_GUILD_EMBLEM,                              0x089F, STATUS_NEVER    ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(SMSG_SCENARIO_POIS,                                  0x020A, STATUS_NEVER    ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(SMSG_SCENARIO_PROGRESS_UPDATE,                       0x02BA, STATUS_NEVER    ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(SMSG_SCENARIO_STATE,                                 0x088F, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_SELL_RESPONSE,                                  0x048E, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_SEND_KNOWN_SPELLS,                              0x045A, STATUS_NEVER    ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(SMSG_SEND_MAIL_RESULT,                               0x1A9B, STATUS_NEVER    ); // 5.4.8 18414

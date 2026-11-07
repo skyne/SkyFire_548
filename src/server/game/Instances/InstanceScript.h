@@ -7,6 +7,7 @@
 #define SKYFIRE_INSTANCE_DATA_H
 
 #include "ObjectMgr.h"
+#include "ScenarioMgr.h"
 #include "World.h"
 #include "WorldStateBuilder.h"
 #include "ZoneScript.h"
@@ -122,7 +123,7 @@ typedef std::map<uint32 /*entry*/, MinionInfo> MinionInfoMap;
 class InstanceScript : public ZoneScript
 {
 public:
-    explicit InstanceScript(Map* map) : instance(map), completedEncounters(0) { }
+    explicit InstanceScript(Map* map) : instance(map), completedEncounters(0), _scenarioId(0), _scenarioStep(-1), _scenarioStartTime(0) { }
 
     virtual ~InstanceScript() { }
 
@@ -213,6 +214,16 @@ public:
 
     void SendEncounterUnit(uint32 type, Unit* unit = NULL, uint8 param1 = 0, uint8 param2 = 0);
 
+    // Scenario stage shown to the players in this instance.
+    void RememberScenarioStep(int32 step, uint32 scenarioId, uint32 startTime);
+    uint32 GetScenarioId() const { return _scenarioId; }
+    int32 GetCurrentScenarioStep() const { return _scenarioStep; }
+    uint32 GetScenarioStartTime() const { return _scenarioStartTime; }
+    uint64 GetScenarioGUID() const;
+    void SendScenarioState(ScenarioData const& data, Player* player = NULL);
+    void SendScenarioProgressUpdate(CriteriaProgressData const& data, Player* player = NULL);
+    void DoFinishLFGDungeon(uint32 dungeonId);
+
     virtual void FillInitialWorldStates(WorldStateBuilder& /*builder*/) { }
 
     // ReCheck PhaseTemplate related conditions
@@ -236,6 +247,10 @@ private:
     DoorInfoMap doors;
     MinionInfoMap minions;
     uint32 completedEncounters; // completed encounter mask, bit indexes are DungeonEncounter.dbc boss numbers, used for packets
+    uint32 _scenarioId;
+    int32 _scenarioStep;
+    uint32 _scenarioStartTime;
+    std::vector<CriteriaProgressData> _scenarioCriteria;
 };
 
 template<class AI, class T>

@@ -641,6 +641,9 @@ void AddSC_boss_hoptallus();
 void AddSC_boss_ook_ook();
 void AddSC_instance_stormstout_brewery();
 void AddSC_stormstout_brewery();
+// Scenarios
+void AddSC_brewing_storm_scenario();
+void AddSC_instance_brewing_storm();
 // Valley of the four Winds
 void AddSC_valley_of_the_four_winds();
 
@@ -1368,6 +1371,9 @@ void AddPandariaScripts()
     AddSC_boss_ook_ook();
     AddSC_instance_stormstout_brewery();
     AddSC_stormstout_brewery();
+    // Scenarios
+    AddSC_brewing_storm_scenario();
+    AddSC_instance_brewing_storm();
     // Valley of the four Winds
     AddSC_valley_of_the_four_winds();
 #endif

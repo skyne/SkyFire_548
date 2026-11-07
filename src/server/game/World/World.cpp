@@ -17,6 +17,7 @@
 #include "BattlePetMgr.h"
 #include "BattlePetSpawnMgr.h"
 #include "BlackMarketMgr.h"
+#include "ScenarioMgr.h"
 #include "CalendarMgr.h"
 #include "CellImpl.h"
 #include "Channel.h"
@@ -2055,6 +2056,12 @@ void World::SetInitialWorldSettings()
 
     SF_LOG_INFO("server.loading", "Loading BlackMarket Templates...");
     sBlackMarketMgr->LoadBlackMarketTemplates();
+
+    SF_LOG_INFO("server.loading", "Loading scenario steps...");
+    sScenarioMgr->LoadDB2Data();
+
+    SF_LOG_INFO("server.loading", "Loading scenario POIs...");
+    sScenarioMgr->LoadScenarioPOI();
 
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 
